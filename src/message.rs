@@ -23,6 +23,7 @@ pub enum MessageType {
     CoordinatorPropose,     // Coordinator sends propose work to clients
     ParticipantVoteCommit,  // Participant votes to commit in phase 1
     ParticipantVoteAbort,   // Participant votes to abort in phase 1
+    ParticipantVoteUnknown, // Participant votes is unknown in phase 1
     CoordinatorAbort,       // Coordinator aborts in phase 2
     CoordinatorCommit,      // Coordinator commits phase 2
     ClientResultCommit,     // result (success/fail) communicated to client

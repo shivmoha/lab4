@@ -119,7 +119,6 @@ impl Coordinator {
     /// 
     pub fn client_join(&mut self, name: &String) -> (crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>) {
         assert!(self.state == CoordinatorState::Quiescent);
-
         // TODO
         let (coordinatorSend, clientReceive) = crossbeam_channel::bounded(0);
         let (clientSend, coordinatorReceive) = crossbeam_channel::bounded(0);
@@ -134,20 +133,28 @@ impl Coordinator {
     /// HINT: you'll need to do something to implement 
     ///       the actual sending!
     /// 
-    pub fn send(&mut self, sender: &crossbeam_channel::Sender<ProtocolMessage>, pm: ProtocolMessage) -> bool {
-        let x: f64 = random();
-        let mut result: bool = true;
-        if x < self.op_success_prob {
-            // TODO: implement actual send
-            sender.send(pm);
-        } else {
+    // pub fn send(&mut self, sender: &crossbeam_channel::Sender<ProtocolMessage>, pm: ProtocolMessage) -> bool {
+    //     let x: f64 = random();
+    //     let mut result: bool = true;
+    //     if x < self.op_success_prob {
+    //         // TODO: implement actual send
+    //         sender.send(pm);
+    //     } else {
+    //         // don't send anything!
+    //         // (simulates failure)
+    //         result = false;
+    //     }
+    //     return result;
+    // }
 
-            // don't send anything!
-            // (simulates failure)
-            result = false;
-        }
+    /// Clarify the use of op succes prob in send message function
+    pub fn send(&mut self, sender: &crossbeam_channel::Sender<ProtocolMessage>, pm: ProtocolMessage) -> bool {
+        let mut result: bool = true;
+        // TODO: implement actual send
+        sender.send(pm);
         return result;
     }
+
 
     /// 
     /// recv_request()
@@ -190,7 +197,6 @@ impl Coordinator {
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     ///
     pub fn protocol(&mut self) {
-
         // TODO!
         while self.running.load(Ordering::Relaxed) {
             trace!(" Coordinator Bool : {:?}", self.running.load(Ordering::Relaxed));
@@ -210,20 +216,25 @@ impl Coordinator {
             for participantChannel in participantsChannels {
                 debug!("Coordinator:: Sending Request to Participant {}", i);
                 let client_request_participant = client_request.clone();
-                self.send(&participantChannel.0, client_request_participant);
-                let msg = participantChannel.1.recv().expect("Error");
-                debug!("Coordinator:: Reading Participant_{} Response {:?}", i, msg);
-                match msg.mtype {
-                    MessageType::ParticipantVoteCommit => commited += 1,
-                    MessageType::ParticipantVoteAbort => aborted += 1,
-                    _ => unknown += 1
+                let result_of_send = self.send(&participantChannel.0, client_request_participant);
+
+                if result_of_send {
+                    let msg = participantChannel.1.recv().expect("Error");
+                    debug!("Coordinator:: Reading Participant_{} Response {:?}", i, msg);
+                    match msg.mtype {
+                        MessageType::ParticipantVoteCommit => commited += 1,
+                        MessageType::ParticipantVoteAbort => aborted += 1,
+                        _ => {}
+                    }
+                    i = i + 1;
+                } else {
+                    unknown += 1
                 }
-                i = i + 1;
             }
 
             /// PHASE: 2
             // Someone voted abort,  send abort to all participants
-            if aborted > 0 {
+            if aborted > 0 || unknown > 0 {
                 debug!("Someone voted abort,  send abort to all participants");
                 let participantsChannels = self.participantsChannels.clone();
                 for participantChannel in participantsChannels {
@@ -239,12 +250,14 @@ impl Coordinator {
                 self.log.append(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
             } else {
                 //All vote commit, send commit to all participants
-                debug!("All vote commit, send commit to all participants");
+                debug!("All vote commit for tid: {} , send commit to all participants", client_request.clone().txid);
                 let participantsChannels = self.participantsChannels.clone();
+                let mut i = 0;
                 for participantChannel in participantsChannels {
                     self.send(&participantChannel.0, ProtocolMessage::generate(CoordinatorCommit, client_request.clone().txid,
                                                                                client_request.clone().senderid, client_request.clone().opid));
-                    debug!("Coordinator:: Sending Commit to Participant");
+                    debug!("Coordinator:: Sending Commit to Participant {}", i);
+                    i = i + 1;
                 }
                 //TODO: Send response to client
                 debug!("Coordinator:: Sending Commit to client {:?}", self.clientsChannels[0].0.capacity());

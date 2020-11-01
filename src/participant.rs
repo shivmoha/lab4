@@ -153,18 +153,19 @@ impl Participant {
         trace!("participant::perform_operation");
 
         let mut result: RequestStatus = RequestStatus::Unknown;
+        let request_message = request.clone().expect("Error in performing operation");
 
         let x: f64 = random();
         //thread::sleep(Duration::from_millis(4000));
         if x > self.op_success_prob {
             // TODO: fail the request
             //TODO: incorrect arguments :: Please fix
-            self.log.append(ParticipantVoteAbort, self.id, format!("{}{}", "participant_", self.id), self.id);
+            self.log.append(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Aborted;
         } else {
             // TODO: request succeeds!
             //TODO: incorrect arguments :: Please fix
-            self.log.append(ParticipantVoteCommit, self.id, format!("{}{}", "participant_", self.id), self.id);
+            self.log.append(ParticipantVoteCommit, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Committed;
         };
 

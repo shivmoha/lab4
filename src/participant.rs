@@ -23,6 +23,7 @@ use oplog;
 use participant::rand::prelude::*;
 
 use self::rand::random;
+use std::alloc::dealloc;
 
 ///
 /// ParticipantState
@@ -154,6 +155,7 @@ impl Participant {
         let mut result: RequestStatus = RequestStatus::Unknown;
 
         let x: f64 = random();
+        thread::sleep(Duration::from_millis(4000));
         if x > self.op_success_prob {
             // TODO: fail the request
             //TODO: incorrect arguments :: Please fix
@@ -208,8 +210,9 @@ impl Participant {
         while self.running.load(Ordering::Relaxed) {
             debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::Relaxed));
             let message = self.receiver.recv().unwrap();
+            debug!("Participant_{}  : Message recieved :: {:?}",self.id,message);
             match message.mtype {
-                ClientRequest => {
+                MessageType::ClientRequest => {
                     debug!("Participant_{}: Operation Received", self.id);
                     let operationResult = self.perform_operation(&Some(message));
                     if operationResult == true {
@@ -221,13 +224,13 @@ impl Participant {
                     }
                 },
 
-                CoordinatorCommit =>{
-                    self.log.append(CoordinatorCommit, self.id, format!("{}{}", "participant_", self.id), self.id);
+                MessageType::CoordinatorCommit =>{
+                    self.log.append(MessageType::CoordinatorCommit, self.id, format!("{}{}", "participant_", self.id), self.id);
                     debug!("Participant_{}: Received CoordinatorCommit", self.id);
                 },
-                CoordinatorAbort =>{
+                MessageType::CoordinatorAbort =>{
                     //TODO: Delete entry of commit from log
-                    self.log.append(CoordinatorAbort, self.id, format!("{}{}", "participant_", self.id), self.id);
+                    self.log.append(MessageType::CoordinatorAbort, self.id, format!("{}{}", "participant_", self.id), self.id);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
 
                 },

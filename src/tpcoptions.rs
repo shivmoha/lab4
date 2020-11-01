@@ -46,7 +46,7 @@ impl TPCOptions {
         let default_n_participants = "1";
         let default_n_clients = "3";
         let default_n_requests = "15";
-        let default_verbosity = "4";
+        let default_verbosity = "3";
         let default_mode = "run";
         let default_success_prob_ops = "1.0";
         let default_success_prob_msg = "1.0";

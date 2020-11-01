@@ -224,7 +224,6 @@ impl Coordinator {
                 for participantChannel in participantsChannels {
                     self.send(&participantChannel.0, ProtocolMessage::generate(CoordinatorCommit, 0, String::from("client_0"), 0));
                     debug!("Coordinator:: Sending Commit to Participant {}", 0);
-
                 }
             }
         }

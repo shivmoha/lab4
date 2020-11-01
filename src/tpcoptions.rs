@@ -15,37 +15,43 @@
 //! your home directory. If that works for you, no change 
 //! should be necessary at all.)
 //! 
-extern crate log;
-extern crate stderrlog;
 extern crate clap;
 extern crate ctrlc;
-use clap::{Arg, App};
+extern crate log;
+extern crate stderrlog;
+
+use clap::{App, Arg};
 
 #[derive(Clone, Debug)]
-pub struct TPCOptions {    
-    pub success_probability_ops: f64,   // probability that an operation succeeds 
-    pub success_probability_msg: f64,   // probability that message send succeeds 
-    pub num_clients: i32,               // number of concurrent clients issuing requests
-    pub num_requests: i32,              // number of requests issued per client
-    pub num_participants: i32,          // number of participants in 2PC protocol (not including coordinator)
-    pub verbosity: usize,               // integer verbosity level. experiment with 0 (default) to 5 (fire-hose of output)
-    pub mode: String,                   // "run" or "check"
+pub struct TPCOptions {
+    pub success_probability_ops: f64,
+    // probability that an operation succeeds
+    pub success_probability_msg: f64,
+    // probability that message send succeeds
+    pub num_clients: i32,
+    // number of concurrent clients issuing requests
+    pub num_requests: i32,
+    // number of requests issued per client
+    pub num_participants: i32,
+    // number of participants in 2PC protocol (not including coordinator)
+    pub verbosity: usize,
+    // integer verbosity level. experiment with 0 (default) to 5 (fire-hose of output)
+    pub mode: String,
+    // "run" or "check"
     pub logpath: String,                // directory for client, participant, and coordinator logs
 }
 
 impl TPCOptions {
-
-    /// 
+    ///
     /// new()
     /// return a new options structure representing
     /// command line options or defaults. initialize
     /// trace/log tools as well. 
     ///
     pub fn new() -> TPCOptions {
-    
         let default_n_participants = "1";
-        let default_n_clients = "3";
-        let default_n_requests = "15";
+        let default_n_clients = "1";
+        let default_n_requests = "2";
         let default_verbosity = "3";
         let default_mode = "run";
         let default_success_prob_ops = "1.0";
@@ -58,43 +64,43 @@ impl TPCOptions {
             .author("Chris Rossbach <rossbach@cs.utexas.edu>")
             .about("2pc exercise written in Rust")
             .arg(Arg::with_name("success_probability_ops")
-                    .short("s")
-                    .required(false)
-                    .takes_value(true)
-                    .help("probability participants successfully execute requests"))
+                .short("s")
+                .required(false)
+                .takes_value(true)
+                .help("probability participants successfully execute requests"))
             .arg(Arg::with_name("success_probability_msg")
-                    .short("S")
-                    .required(false)
-                    .takes_value(true)
-                    .help("probability participants successfully send messages"))
+                .short("S")
+                .required(false)
+                .takes_value(true)
+                .help("probability participants successfully send messages"))
             .arg(Arg::with_name("num_clients")
-                    .short("c")
-                    .required(false)
-                    .takes_value(true)
-                    .help("number of clients making requests"))
+                .short("c")
+                .required(false)
+                .takes_value(true)
+                .help("number of clients making requests"))
             .arg(Arg::with_name("num_requests")
-                    .short("r")
-                    .required(false)
-                    .takes_value(true)
-                    .help("number of requests made per client"))
+                .short("r")
+                .required(false)
+                .takes_value(true)
+                .help("number of requests made per client"))
             .arg(Arg::with_name("num_participants")
-                    .short("p")
-                    .required(false)
-                    .takes_value(true)
-                    .help("number of participants in protocol"))
+                .short("p")
+                .required(false)
+                .takes_value(true)
+                .help("number of participants in protocol"))
             .arg(Arg::with_name("verbose")
-                    .short("v")
-                    .required(false)
-                    .takes_value(true)
-                    .help("produce verbose output: 0->none, 5->*most* verbose"))       
+                .short("v")
+                .required(false)
+                .takes_value(true)
+                .help("produce verbose output: 0->none, 5->*most* verbose"))
             .arg(Arg::with_name("mode")
-                    .short("m")
-                    .required(false)
-                    .takes_value(true)
-                    .help("mode--\"run\" runs 2pc, \"check\" checks logs produced by previous run"))       
+                .short("m")
+                .required(false)
+                .takes_value(true)
+                .help("mode--\"run\" runs 2pc, \"check\" checks logs produced by previous run"))
             .get_matches();
-        
-        let _mode = matches.value_of("mode").unwrap_or(default_mode);    
+
+        let _mode = matches.value_of("mode").unwrap_or(default_mode);
         let f_success_prob_ops = matches.value_of("success_probability_ops").unwrap_or(default_success_prob_ops).parse::<f64>().unwrap();
         let f_success_prob_msg = matches.value_of("success_probability_msg").unwrap_or(default_success_prob_msg).parse::<f64>().unwrap();
         let n_participants = matches.value_of("num_participants").unwrap_or(default_n_participants).parse::<i32>().unwrap();
@@ -104,10 +110,10 @@ impl TPCOptions {
         let _logpath = matches.value_of("logpath").unwrap_or(default_logpath);
 
         match _mode.as_ref() {
-            "run" => {},
-            "check" => {},
+            "run" => {}
+            "check" => {}
             _ => panic!("unknown execution mode requested!"),
-        } 
+        }
 
         TPCOptions {
             success_probability_ops: f_success_prob_ops,

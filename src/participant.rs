@@ -6,6 +6,7 @@ extern crate log;
 extern crate rand;
 extern crate stderrlog;
 
+use std::alloc::dealloc;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -23,7 +24,6 @@ use oplog;
 use participant::rand::prelude::*;
 
 use self::rand::random;
-use std::alloc::dealloc;
 
 ///
 /// ParticipantState
@@ -155,7 +155,7 @@ impl Participant {
         let mut result: RequestStatus = RequestStatus::Unknown;
 
         let x: f64 = random();
-        thread::sleep(Duration::from_millis(4000));
+        //thread::sleep(Duration::from_millis(4000));
         if x > self.op_success_prob {
             // TODO: fail the request
             //TODO: incorrect arguments :: Please fix
@@ -209,34 +209,36 @@ impl Participant {
         // TODO
         while self.running.load(Ordering::Relaxed) {
             debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::Relaxed));
-            let message = self.receiver.recv().unwrap();
-            debug!("Participant_{}  : Message recieved :: {:?}",self.id,message);
-            match message.mtype {
+            let message = self.receiver.recv();
+            if message.is_err() {
+                continue;
+            }
+
+            let message = message.expect("Participant :: Error in receiving message from coordinator");
+            debug!("Participant_{}  : Message recieved :: {:?}", self.id, message);
+            match message.clone().mtype {
                 MessageType::ClientRequest => {
                     debug!("Participant_{}: Operation Received", self.id);
-                    let operationResult = self.perform_operation(&Some(message));
+                    let operationResult = self.perform_operation(&Some(message.clone()));
                     if operationResult == true {
-                        self.send(ProtocolMessage::generate(ParticipantVoteCommit, self.id, format!("{}{}", "participant_", self.id), 0));
+                        self.send(ProtocolMessage::generate(ParticipantVoteCommit, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Commit", self.id);
                     } else {
-                        self.send(ProtocolMessage::generate(ParticipantVoteAbort, self.id, format!("{}{}", "participant_", self.id), 0));
+                        self.send(ProtocolMessage::generate(ParticipantVoteAbort, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Abort", self.id);
                     }
-                },
-
-                MessageType::CoordinatorCommit =>{
-                    self.log.append(MessageType::CoordinatorCommit, self.id, format!("{}{}", "participant_", self.id), self.id);
+                }
+                MessageType::CoordinatorCommit => {
+                    self.log.append(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorCommit", self.id);
-                },
-                MessageType::CoordinatorAbort =>{
+                }
+                MessageType::CoordinatorAbort => {
                     //TODO: Delete entry of commit from log
-                    self.log.append(MessageType::CoordinatorAbort, self.id, format!("{}{}", "participant_", self.id), self.id);
+                    self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
-
-                },
+                }
 
                 _ => debug!("No match found")
-
             }
         }
         // self.wait_for_exit_signal();

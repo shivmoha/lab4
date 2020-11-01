@@ -64,10 +64,10 @@ fn register_clients(
         let (clientSend, clientReceive) = coordinator.client_join(&clientName);
 
         let clientLogPath = format!("{}/{}", logpathbase, clientName);
-        debug!("Registering client : {} Logs at : {}", c, clientLogPath);
+        trace!("Registering client : {} Logs at : {}", c, clientLogPath);
         clients.push(Client::new(c, String::new(), clientSend, clientReceive, running.clone()));
     }
-    clients
+    return clients;
 }
 
 /// 
@@ -110,17 +110,17 @@ fn register_participants(
     // add client to the vector and return the vector.
 
     for i in 0..n_participants {
-        debug!("Joining {}", i);
+        trace!("Joining {}", i);
         let participantName = format!("{}{}", "participant_", i);
         let (participantSend, participantReceive) = coordinator.participant_join(&participantName);
 
-        let participantPath = format!("{}/{}", logpathbase, participantName);
-        debug!("Registering participant : {} Logs at : {}", i, participantPath);
+        let participantPath = format!("{}/{}.log", logpathbase, participantName);
+        trace!("Registering participant : {} Logs at : {}", i, participantPath);
         participants.push(Participant::new(i, String::new(), participantSend, participantReceive, participantPath, running.clone(),
                                            success_prob_ops, success_prob_msg));
     }
 
-    participants
+    return participants;
 }
 
 ///
@@ -139,11 +139,22 @@ fn register_participants(
 fn launch_clients(
     clients: Vec<Client>,
     n_requests: i32,
-    handles: &mut Vec<JoinHandle<()>>) {
+    handles: &mut Vec<JoinHandle<()>>) -> &mut Vec<JoinHandle<()>> {
 
     // do something to create threads for client 'processes'
     // the mutable handles parameter allows you to return 
-    // more than one wait handle to the caller to join on. 
+    // more than one wait handle to the caller to join on.
+    for mut client in clients {
+        let handle = thread::spawn(move || {
+            // debug!("in thread ");
+            // thread::sleep(Duration::from_millis(4000));
+            client.protocol(n_requests);
+        });
+
+        handles.push(handle);
+    }
+
+    return handles;
 }
 
 ///
@@ -194,7 +205,9 @@ fn run(opts: &tpcoptions::TPCOptions) {
     // vector for wait handles, allowing us to 
     // wait for client, participant, and coordinator 
     // threads to join.
-    let mut handles: Vec<JoinHandle<()>> = vec![];
+    let mut participantHandles: Vec<JoinHandle<()>> = vec![];
+    let mut clientHandles: Vec<JoinHandle<()>> = vec![];
+
 
     // create an atomic bool object and a signal handler
     // that sets it. this allows us to inform clients and 
@@ -217,25 +230,30 @@ fn run(opts: &tpcoptions::TPCOptions) {
     let participants: Vec<Participant>;
 
     coordinator = Coordinator::new(cpath, running.clone(), opts.success_probability_ops);
-    //clients = register_clients(&mut coordinator, opts.num_clients, &opts.logpath, &running);
+    clients = register_clients(&mut coordinator, opts.num_clients, &opts.logpath, &running);
     participants = register_participants(&mut coordinator, opts.num_participants, &opts.logpath, &running,
                                          opts.success_probability_ops, opts.success_probability_msg);
 
 
-    // launch_clients(clients,opts.num_requests,&mut handles);
-
-
-    launch_participants(participants, &mut handles);
     let coordinatorHandle = thread::spawn(move || {
         coordinator.protocol();
     });
+    launch_clients(clients, opts.num_requests, &mut clientHandles);
+    launch_participants(participants, &mut participantHandles);
+
 
     // wait for clients, participants, and coordinator here...
-    for participant in handles {
+    for participant in participantHandles {
         participant.join().expect("oops! the participant thread panicked");
     }
 
     coordinatorHandle.join().expect("oops! the coordinator thread panicked");
+
+    for client in clientHandles {
+        client.join().expect("oops! the client thread panicked");
+    }
+
+
 }
 
 ///

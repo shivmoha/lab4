@@ -4,12 +4,15 @@
 //! 
 extern crate log;
 extern crate stderrlog;
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::atomic::{AtomicI32, AtomicBool, Ordering};
-use std::sync::{Arc};
-use std::time::Duration;
-use std::thread;
+
+use std::alloc::dealloc;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
+use std::time::Duration;
+
 use message;
 use message::{MessageType, ProtocolMessage};
 use message::RequestStatus;
@@ -21,8 +24,11 @@ static TXID_COUNTER: AtomicI32 = AtomicI32::new(1);
 // primitives for communicating with 
 // the coordinator
 #[derive(Debug)]
-pub struct Client {    
+pub struct Client {
     pub id: i32,
+    sender: crossbeam_channel::Sender<ProtocolMessage>,
+    receiver: crossbeam_channel::Receiver<ProtocolMessage>,
+    running: Arc<AtomicBool>,
     // ...
 }
 
@@ -34,8 +40,7 @@ pub struct Client {
 /// 3. pub fn protocol(&mut self, n_requests: i32) -- implements client side protocol
 ///
 impl Client {
-
-    /// 
+    ///
     /// new()
     /// 
     /// Return a new client, ready to run the 2PC protocol
@@ -49,13 +54,16 @@ impl Client {
     /// 
     pub fn new(i: i32,
                is: String,
-               tx: crossbeam_channel::Sender<ProtocolMessage>,
-               rx: crossbeam_channel::Receiver<ProtocolMessage>,
+               sender: crossbeam_channel::Sender<ProtocolMessage>,
+               receiver: crossbeam_channel::Receiver<ProtocolMessage>,
                r: Arc<AtomicBool>) -> Client {
         Client {
             id: i,
+            sender: sender,
+            receiver: receiver,
+            running: r,
             // ...
-        }   
+        }
     }
 
     ///
@@ -63,11 +71,8 @@ impl Client {
     /// wait until the running flag is set by the CTRL-C handler
     /// 
     pub fn wait_for_exit_signal(&mut self) {
-
         trace!("Client_{} waiting for exit signal", self.id);
-
-        // TODO 
-
+        while self.running.load(Ordering::Relaxed) {}
         trace!("Client_{} exiting", self.id);
     }
 
@@ -76,7 +81,6 @@ impl Client {
     /// send the next operation to the coordinator
     /// 
     pub fn send_next_operation(&mut self) {
-
         trace!("Client_{}::send_next_operation", self.id);
 
         // create a new request with a unique TXID.         
@@ -84,14 +88,16 @@ impl Client {
         let txid = TXID_COUNTER.fetch_add(1, Ordering::SeqCst);
 
         info!("Client {} request({})->txid:{} called", self.id, request_no, txid);
-        let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, 
-                                                    txid, 
-                                                    format!("Client_{}", self.id), 
+        let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest,
+                                                    txid,
+                                                    format!("Client_{}", self.id),
                                                     request_no);
 
         info!("client {} calling send...", self.id);
 
-        // TODO
+        let pmClone = pm.clone();
+        self.sender.send(pm);
+        debug!("Client: Send request  {:?}", pmClone);
 
         trace!("Client_{}::exit send_next_operation", self.id);
     }
@@ -103,11 +109,11 @@ impl Client {
     /// not fail in this simulation
     /// 
     pub fn recv_result(&mut self) {
-
         trace!("Client_{}::recv_result", self.id);
 
-        // TODO
-
+        debug!("Client: Waiting for  response ");
+        let msg = self.receiver.recv().unwrap();
+        debug!("Client: Received response {:?}", msg);
         trace!("Client_{}::exit recv_result", self.id);
     }
 
@@ -120,10 +126,10 @@ impl Client {
 
         // TODO: collect real stats!
         let successful_ops: usize = 0;
-        let failed_ops: usize = 0; 
-        let unknown_ops: usize = 0; 
+        let failed_ops: usize = 0;
+        let unknown_ops: usize = 0;
         println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, successful_ops, failed_ops, unknown_ops);
-    }    
+    }
 
     ///
     /// protocol()
@@ -136,10 +142,15 @@ impl Client {
 
         // run the 2PC protocol for each of n_requests
 
-        // TODO 
+        // TODO
 
+        for i in 0..n_requests {
+            self.send_next_operation();
+            self.recv_result();
+        }
         // wait for signal to exit
         // and then report status
+
         self.wait_for_exit_signal();
         self.report_status();
     }

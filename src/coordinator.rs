@@ -147,7 +147,7 @@ impl Coordinator {
     //     return result;
     // }
 
-    /// Clarify the use of op succes prob in send message function
+    /// Clarify the use of op succes prob in send message function above
     pub fn send(&mut self, sender: &crossbeam_channel::Sender<ProtocolMessage>, pm: ProtocolMessage) -> bool {
         let mut result: bool = true;
         // TODO: implement actual send

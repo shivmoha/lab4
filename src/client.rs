@@ -29,6 +29,9 @@ pub struct Client {
     sender: crossbeam_channel::Sender<ProtocolMessage>,
     receiver: crossbeam_channel::Receiver<ProtocolMessage>,
     running: Arc<AtomicBool>,
+    successful: usize,
+    failed : usize,
+    unknown : usize,
     // ...
 }
 
@@ -62,6 +65,9 @@ impl Client {
             sender: sender,
             receiver: receiver,
             running: r,
+            successful : 0,
+            failed : 0,
+            unknown : 0,
             // ...
         }
     }
@@ -73,6 +79,9 @@ impl Client {
     pub fn wait_for_exit_signal(&mut self) {
         trace!("Client_{} waiting for exit signal", self.id);
         while self.running.load(Ordering::Relaxed) {}
+
+        info!("Client_{}::Shutting Down", self.id);
+
         trace!("Client_{} exiting", self.id);
     }
 
@@ -113,6 +122,12 @@ impl Client {
 
         debug!("Client: Waiting for  response ");
         let msg = self.receiver.recv().unwrap();
+
+        match msg.clone().mtype {
+            MessageType::ClientResultAbort => {self.failed+=1;},
+            MessageType::CoordinatorCommit => {self.successful+=1},
+            _ => {}
+        }
         debug!("Client: Received response {:?}", msg);
         trace!("Client_{}::exit recv_result", self.id);
     }
@@ -128,7 +143,8 @@ impl Client {
         let successful_ops: usize = 0;
         let failed_ops: usize = 0;
         let unknown_ops: usize = 0;
-        println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, successful_ops, failed_ops, unknown_ops);
+        //println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, successful_ops, failed_ops, unknown_ops);
+        println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, self.successful, self.failed, self.unknown);
     }
 
     ///
@@ -152,6 +168,6 @@ impl Client {
         // and then report status
 
         self.wait_for_exit_signal();
-        self.report_status();
+        //self.report_status();
     }
 }

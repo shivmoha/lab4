@@ -51,6 +51,9 @@ pub struct Coordinator {
     participantsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
     clientsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
     running: Arc<AtomicBool>,
+    successful: usize,
+    failed: usize,
+    unknown: usize,
 
     // TODO: ...
 }
@@ -86,6 +89,10 @@ impl Coordinator {
             participantsChannels: vec![],
             clientsChannels: vec![],
             running: r,
+            successful: 0,
+            failed: 0,
+            unknown: 0,
+
             // TODO...
         }
     }
@@ -161,21 +168,26 @@ impl Coordinator {
     /// receive a message from a client
     /// to start off the protocol.
     /// 
-    pub fn recv_request(&mut self) -> (Option<ProtocolMessage>) {
+    pub fn recv_request(&mut self) -> (Option<ProtocolMessage>, usize) {
         let mut result = Option::None;
         assert!(self.state == CoordinatorState::Quiescent);
         trace!("coordinator::recv_request...");
 
-        debug!("Coordinator:: Received Request from Client Starting");
-        let msg = self.clientsChannels[0].1.recv();
-        debug!("Coordinator:: Received Request from Client :::  {:?} ", msg.is_ok());
+        debug!("Coordinator:: Waiting for client request");
 
-        if msg.is_ok() {
-            result = Option::from(msg.unwrap());
+        let clientChannels = self.clientsChannels.clone();
+        for clientChannel in clientChannels {
+            let msg = clientChannel.1.try_recv();
+            if msg.is_ok() {
+                let clientId = msg.clone().unwrap().senderid.split("_").collect::<Vec<&str>>()[1].to_string();
+                debug!("Coordinator:: Received request from  client_{}", clientId);
+                result = Option::from(msg.unwrap());
+                return (result, clientId.parse::<usize>().unwrap());
+            }
         }
         //self.clientsChannels[0].0.send(msg.clone().unwrap());
         trace!("leaving coordinator::recv_request");
-        return result;
+        return (result, 0);
     }
 
     ///
@@ -187,7 +199,8 @@ impl Coordinator {
         let successful_ops: usize = 0; // TODO!
         let failed_ops: usize = 0; // TODO!
         let unknown_ops: usize = 0; // TODO!
-        println!("coordinator:\tC:{}\tA:{}\tU:{}", successful_ops, failed_ops, unknown_ops);
+        // println!("coordinator:\tC:{}\tA:{}\tU:{}", successful_ops, failed_ops, unknown_ops);
+        println!("coordinator:\tC:{}\tA:{}\tU:{}", self.successful, self.failed, self.unknown);
     }
 
     ///
@@ -201,7 +214,9 @@ impl Coordinator {
         while self.running.load(Ordering::Relaxed) {
             trace!(" Coordinator Bool : {:?}", self.running.load(Ordering::Relaxed));
 
-            let client_request = self.recv_request();
+            let client_request_and_id = self.recv_request();
+            let client_request = client_request_and_id.0;
+            let clientId = client_request_and_id.1;
             if client_request.is_none() {
                 continue;
             }
@@ -244,10 +259,11 @@ impl Coordinator {
                 }
                 //TODO: Send response to client
                 debug!("Coordinator:: Sending Abort to Client : START");
-                self.clientsChannels[0].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
-                                                                         client_request.clone().senderid, client_request.clone().opid));
+                self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
+                                                                                client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Abort to Client : DONE");
                 self.log.append(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
+                self.failed += 1
             } else {
                 //All vote commit, send commit to all participants
                 debug!("All vote commit for tid: {} , send commit to all participants", client_request.clone().txid);
@@ -262,10 +278,11 @@ impl Coordinator {
                 //TODO: Send response to client
                 debug!("Coordinator:: Sending Commit to client {:?}", self.clientsChannels[0].0.capacity());
 
-                self.clientsChannels[0].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
-                                                                         client_request.clone().senderid, client_request.clone().opid));
+                self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
+                                                                                client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Commit to client done");
                 self.log.append(CoordinatorCommit, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
+                self.successful += 1;
             }
         }
         self.report_status();

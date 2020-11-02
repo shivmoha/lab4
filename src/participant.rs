@@ -50,7 +50,9 @@ pub struct Participant {
     sender: crossbeam_channel::Sender<ProtocolMessage>,
     receiver: crossbeam_channel::Receiver<ProtocolMessage>,
     running: Arc<AtomicBool>,
-    // TODO...
+    successful: usize,
+    failed : usize,
+    unknown : usize,
 }
 
 ///
@@ -92,6 +94,9 @@ impl Participant {
             sender: send,
             receiver: receive,
             running: r,
+            successful : 0,
+            failed : 0,
+            unknown : 0,
 
             // TODO ... 
         }
@@ -162,6 +167,7 @@ impl Participant {
             //TODO: incorrect arguments :: Please fix
             self.log.append(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Aborted;
+
         } else {
             // TODO: request succeeds!
             //TODO: incorrect arguments :: Please fix
@@ -184,7 +190,8 @@ impl Participant {
         let global_successful_ops: usize = 0;
         let global_failed_ops: usize = 0;
         let global_unknown_ops: usize = 0;
-        println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, global_successful_ops, global_failed_ops, global_unknown_ops);
+       // println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, global_successful_ops, global_failed_ops, global_unknown_ops);
+        println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, self.successful, self.failed, self.unknown);
     }
 
     ///
@@ -224,9 +231,11 @@ impl Participant {
                     if operationResult == true {
                         self.send(ProtocolMessage::generate(ParticipantVoteCommit, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Commit", self.id);
+                        self.successful+=1;
                     } else {
                         self.send(ProtocolMessage::generate(ParticipantVoteAbort, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Abort", self.id);
+                        self.failed+=1;
                     }
                 }
                 MessageType::CoordinatorCommit => {
@@ -243,7 +252,7 @@ impl Participant {
             }
         }
         // self.wait_for_exit_signal();
-        // self.report_status();
+        self.report_status();
 
         info!("Participant_{}::Shutting Down", self.id);
     }

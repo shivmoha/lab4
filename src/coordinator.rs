@@ -214,6 +214,7 @@ impl Coordinator {
         while self.running.load(Ordering::Relaxed) {
             trace!(" Coordinator Bool : {:?}", self.running.load(Ordering::Relaxed));
 
+            /// Receive request from client
             let client_request_and_id = self.recv_request();
             let client_request = client_request_and_id.0;
             let clientId = client_request_and_id.1;

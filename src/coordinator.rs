@@ -217,43 +217,44 @@ impl Coordinator {
 
             let mut i = 0;
             let participantsChannels = self.participantsChannels.clone();
+            let participantsChannelsR = self.participantsChannels.clone();
+
 
             /// PHASE: 1
+            // Send client request to participants
             for participantChannel in participantsChannels {
                 debug!("Coordinator:: Sending Request to Participant {}", i);
                 let client_request_participant = client_request.clone();
                 let result_of_send = self.send(&participantChannel.0, client_request_participant);
-
-                // if the send was successful, wait for receiving reponse
-                if result_of_send {
-
-                    //Wait for reply from participant
-                    let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(10));
-
-                    // if the response is received before timeout, process the response
-                    if msg_result.is_ok() {
-                        let msg = msg_result.unwrap();
-                        match msg.mtype {
-                            MessageType::ParticipantVoteCommit => committed += 1,
-                            MessageType::ParticipantVoteAbort => aborted += 1,
-                            _ => {}
-                        }
-                        debug!("Coordinator:: Reading Participant_{} Response {:?}", i, msg);
-                    } else {
-                        // if the response is not received before timeout, mark the status as unknown
-                        debug!("Coordinator:: Reading Participant_{} Response Timeout", i);
-                        unknown += 1;
-                    }
-                    i = i + 1;
-                } else {
-                    // if the send was not successful, when mark the status of participant as unknown
-                    unknown += 1;
-                }
+                i = i + 1;
             }
 
+            // Receive responses from all partitions
+            i = 0;
+            for participantChannel in participantsChannelsR {
+                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(10));
+                // if the response is received before timeout, process the response
+                if msg_result.is_ok() {
+                    let msg = msg_result.unwrap();
+                    match msg.mtype {
+                        MessageType::ParticipantVoteCommit => committed += 1,
+                        MessageType::ParticipantVoteAbort => aborted += 1,
+                        _ => {}
+                    }
+                    debug!("Coordinator:: Reading Participant_{} Response {:?}", i, msg);
+                } else {
+                    // if the response is not received before timeout, mark the status as unknown
+                    debug!("Coordinator:: Reading Participant_{} Response Timeout", i);
+                    unknown += 1;
+                }
+                i = i + 1;
+            }
+
+
             /// PHASE: 2
-            // Someone voted abort,  send abort to all participants
+            /// Someone voted abort or didn't respond,  send abort to all participants
             if aborted > 0 || unknown > 0 {
+                self.log.append(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
                 debug!("Someone voted abort or is unknown,  send abort to all participants");
                 let participantsChannels = self.participantsChannels.clone();
                 for participantChannel in participantsChannels {
@@ -268,10 +269,10 @@ impl Coordinator {
                 self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
                                                                                 client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Abort to Client : DONE");
-                self.log.append(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
                 self.failed += 1
             } else {
-                //All voted commit, send commit to all participants
+                self.log.append(CoordinatorCommit, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
+                ///All voted commit, send commit to all participants
                 debug!("All voted commit for tid: {} , send commit to all participants", client_request.clone().txid);
                 let participantsChannels = self.participantsChannels.clone();
                 let mut i = 0;
@@ -289,7 +290,6 @@ impl Coordinator {
                 self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
                                                                                 client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Commit to client done");
-                self.log.append(CoordinatorCommit, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
                 self.successful += 1;
             }
         }

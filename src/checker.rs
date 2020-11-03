@@ -38,8 +38,8 @@ fn check_participant(
     nabort: usize,
     ccommitted: &HashMap<i32, ProtocolMessage>,
     plog: &HashMap<i32, ProtocolMessage>
-    ) -> bool {
-    
+) -> bool {
+
     let mut result = true;
     let pcommitted = plog.iter()
         .filter(|e| (*e.1).mtype == MessageType::CoordinatorCommit)
@@ -92,43 +92,41 @@ fn check_participant(
 ///
 pub fn check_last_run(
     n_clients: i32,
-    n_requests: i32, 
-    n_participants: i32, 
+    n_requests: i32,
+    n_participants: i32,
     logpathbase: &String) {
 
-        info!("Checking 2PC run:  {} requests * {} clients, {} participants", 
-              n_requests, 
-              n_clients,
-              n_participants);
+    info!("Checking 2PC run:  {} requests * {} clients, {} participants",
+          n_requests,
+          n_clients,
+          n_participants);
 
-        let mut logs = HashMap::new();
-        for pid in 0..n_participants {
-             let pid_str = format!("participant_{}", pid);
-             let plogpath = format!("{}//{}.log", logpathbase, pid_str);
-             let plog = OpLog::from_file(plogpath);
-             logs.insert(pid_str, plog);
-        }
-        let clogpath = format!("{}//{}", logpathbase, "coordinator.log");
-        let clog = OpLog::from_file(clogpath);        
-
-        let lck = clog.arc();
-        let cmap = lck.lock().unwrap();
-        let committed: HashMap<i32, message::ProtocolMessage> = 
-            cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorCommit)
-                       .map(|(k,v)| (k.clone(), v.clone()))
-                       .collect();
-        let aborted: HashMap<i32, message::ProtocolMessage> = 
-            cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorAbort)
-                       .map(|(k,v)| (k.clone(), v.clone()))
-                       .collect();
-        let ncommit = committed.len();
-        let nabort = aborted.len();
-
-        for(p, v) in logs.iter() {
-            let plck = v.arc();
-            let plog = plck.lock().unwrap();
-            check_participant(p, ncommit, nabort, &committed, &plog);
-        }
+    let mut logs = HashMap::new();
+    for pid in 0..n_participants {
+        let pid_str = format!("participant_{}", pid);
+        let plogpath = format!("{}//{}.log", logpathbase, pid_str);
+        let plog = OpLog::from_file(plogpath);
+        logs.insert(pid_str, plog);
     }
+    let clogpath = format!("{}//{}", logpathbase, "coordinator.log");
+    let clog = OpLog::from_file(clogpath);
 
+    let lck = clog.arc();
+    let cmap = lck.lock().unwrap();
+    let committed: HashMap<i32, message::ProtocolMessage> =
+        cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorCommit)
+            .map(|(k,v)| (k.clone(), v.clone()))
+            .collect();
+    let aborted: HashMap<i32, message::ProtocolMessage> =
+        cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorAbort)
+            .map(|(k,v)| (k.clone(), v.clone()))
+            .collect();
+    let ncommit = committed.len();
+    let nabort = aborted.len();
 
+    for(p, v) in logs.iter() {
+        let plck = v.arc();
+        let plog = plck.lock().unwrap();
+        check_participant(p, ncommit, nabort, &committed, &plog);
+    }
+}

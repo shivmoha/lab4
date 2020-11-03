@@ -61,7 +61,7 @@ impl TPCOptions {
 
         let matches = App::new("cs380p-2pc")
             .version("0.1.0")
-            .author("Chris Rossbach <rossbach@cs.utexas.edu>")
+            .author("Shivam Mohan <shivmoha@utexas.edu>")
             .about("2pc exercise written in Rust")
             .arg(Arg::with_name("success_probability_ops")
                 .short("s")

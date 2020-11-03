@@ -51,8 +51,8 @@ pub struct Participant {
     receiver: crossbeam_channel::Receiver<ProtocolMessage>,
     running: Arc<AtomicBool>,
     successful: usize,
-    failed : usize,
-    unknown : usize,
+    failed: usize,
+    unknown: usize,
 }
 
 ///
@@ -94,9 +94,9 @@ impl Participant {
             sender: send,
             receiver: receive,
             running: r,
-            successful : 0,
-            failed : 0,
-            unknown : 0,
+            successful: 0,
+            failed: 0,
+            unknown: 0,
 
             // TODO ... 
         }
@@ -137,6 +137,7 @@ impl Participant {
         if x < self.msg_success_prob {
             result = self.send(pm);
         } else {
+            debug!("Message Dropped");
             result = false;
         }
         result
@@ -164,13 +165,10 @@ impl Participant {
         //thread::sleep(Duration::from_millis(4000));
         if x > self.op_success_prob {
             // TODO: fail the request
-            //TODO: incorrect arguments :: Please fix
             self.log.append(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Aborted;
-
         } else {
             // TODO: request succeeds!
-            //TODO: incorrect arguments :: Please fix
             self.log.append(ParticipantVoteCommit, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Committed;
         };
@@ -190,7 +188,7 @@ impl Participant {
         let global_successful_ops: usize = 0;
         let global_failed_ops: usize = 0;
         let global_unknown_ops: usize = 0;
-       // println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, global_successful_ops, global_failed_ops, global_unknown_ops);
+        // println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, global_successful_ops, global_failed_ops, global_unknown_ops);
         println!("participant_{}:\tC:{}\tA:{}\tU:{}", self.id, self.successful, self.failed, self.unknown);
     }
 
@@ -215,8 +213,8 @@ impl Participant {
     pub fn protocol(&mut self) {
         info!("Participant_{}::protocol", self.id);
         // TODO
-        while self.running.load(Ordering::Relaxed) {
-            debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::Relaxed));
+        while self.running.load(Ordering::SeqCst) {
+            debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::SeqCst));
             let message = self.receiver.recv();
             if message.is_err() {
                 continue;
@@ -229,13 +227,13 @@ impl Participant {
                     debug!("Participant_{}: Operation Received", self.id);
                     let operationResult = self.perform_operation(&Some(message.clone()));
                     if operationResult == true {
-                        self.send(ProtocolMessage::generate(ParticipantVoteCommit, message.clone().txid, message.clone().senderid, message.clone().opid));
+                        self.send_unreliable(ProtocolMessage::generate(ParticipantVoteCommit, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Commit", self.id);
-                        self.successful+=1;
+                        self.successful += 1;
                     } else {
-                        self.send(ProtocolMessage::generate(ParticipantVoteAbort, message.clone().txid, message.clone().senderid, message.clone().opid));
+                        self.send_unreliable(ProtocolMessage::generate(ParticipantVoteAbort, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Abort", self.id);
-                        self.failed+=1;
+                        self.failed += 1;
                     }
                 }
                 MessageType::CoordinatorCommit => {

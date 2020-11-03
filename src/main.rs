@@ -58,11 +58,9 @@ fn register_clients(
     let mut clients = vec![];
     // register clients with coordinator (set up communication channels and sync objects)
     // add client to the vector and return the vector.
-
     for c in 0..n_clients {
-        let clientName = format!("{}{}", "client_", c);
+        let clientName = format!("{}{}", "Client_", c);
         let (clientSend, clientReceive) = coordinator.client_join(&clientName);
-
         let clientLogPath = format!("{}/{}", logpathbase, clientName);
         trace!("Registering client : {} Logs at : {}", c, clientLogPath);
         clients.push(Client::new(c, String::new(), clientSend, clientReceive, running.clone()));
@@ -108,18 +106,15 @@ fn register_participants(
     let mut participants = vec![];
     // register participants with coordinator (set up communication channels and sync objects)
     // add client to the vector and return the vector.
-
     for i in 0..n_participants {
-        trace!("Joining {}", i);
-        let participantName = format!("{}{}", "participant_", i);
+        trace!("Participant_{} joining", i);
+        let participantName = format!("{}{}", "Participant_", i);
         let (participantSend, participantReceive) = coordinator.participant_join(&participantName);
-
         let participantPath = format!("{}/{}.log", logpathbase, participantName);
         trace!("Registering participant : {} Logs at : {}", i, participantPath);
         participants.push(Participant::new(i, String::new(), participantSend, participantReceive, participantPath, running.clone(),
                                            success_prob_ops, success_prob_msg));
     }
-
     return participants;
 }
 
@@ -150,10 +145,8 @@ fn launch_clients(
             // thread::sleep(Duration::from_millis(4000));
             client.protocol(n_requests);
         });
-
         handles.push(handle);
     }
-
     return handles;
 }
 
@@ -246,14 +239,10 @@ fn run(opts: &tpcoptions::TPCOptions) {
     for participant in participantHandles {
         participant.join().expect("oops! the participant thread panicked");
     }
-
     coordinatorHandle.join().expect("oops! the coordinator thread panicked");
-
     for client in clientHandles {
         client.join().expect("oops! the client thread panicked");
     }
-
-
 }
 
 ///

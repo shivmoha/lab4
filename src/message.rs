@@ -7,7 +7,9 @@
 //! 
 extern crate serde;
 extern crate serde_json;
+
 use std::sync::atomic::{AtomicI32, Ordering};
+
 use self::serde_json::Value;
 
 ///
@@ -18,16 +20,23 @@ use self::serde_json::Value;
 /// HINT: You should find it necessary to add to this list!
 /// 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MessageType {    
-    ClientRequest,          // Request a transaction from the coordinator
-    CoordinatorPropose,     // Coordinator sends propose work to clients
-    ParticipantVoteCommit,  // Participant votes to commit in phase 1
-    ParticipantVoteAbort,   // Participant votes to abort in phase 1
-    ParticipantVoteUnknown, // Participant votes is unknown in phase 1
-    CoordinatorAbort,       // Coordinator aborts in phase 2
-    CoordinatorCommit,      // Coordinator commits phase 2
-    ClientResultCommit,     // result (success/fail) communicated to client
-    ClientResultAbort,      // result (success/fail) communicated to client
+pub enum MessageType {
+    ClientRequest,
+    // Request a transaction from the coordinator
+    CoordinatorPropose,
+    // Coordinator sends propose work to clients
+    ParticipantVoteCommit,
+    // Participant votes to commit in phase 1
+    ParticipantVoteAbort,
+    // Participant votes to abort in phase 1
+    CoordinatorAbort,
+    // Coordinator aborts in phase 2
+    CoordinatorCommit,
+    // Coordinator commits phase 2
+    ClientResultCommit,
+    // result (success/fail) communicated to client
+    ClientResultAbort,
+    // result (success/fail) communicated to client
     CoordinatorExit,        // Coordinator telling client/participant about shut down
 }
 
@@ -37,9 +46,11 @@ pub enum MessageType {
 /// HINT: you can probably leave this one alone.
 /// 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RequestStatus {    
-    Committed,              // Request succeeded
-    Aborted,                // Request explicitly aborted
+pub enum RequestStatus {
+    Committed,
+    // Request succeeded
+    Aborted,
+    // Request explicitly aborted
     Unknown,                // Request status unknown (typically timed out)
 }
 
@@ -57,7 +68,7 @@ pub struct ProtocolMessage {
     pub mtype: MessageType,
     pub uid: i32,
     pub txid: i32,
-    pub senderid: String, 
+    pub senderid: String,
     pub opid: i32,
 }
 
@@ -88,5 +99,4 @@ impl ProtocolMessage {
         let pm: ProtocolMessage = serde_json::from_value(data).unwrap();
         pm
     }
-
 }

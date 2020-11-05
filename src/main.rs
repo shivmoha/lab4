@@ -108,7 +108,7 @@ fn register_participants(
     // add client to the vector and return the vector.
     for i in 0..n_participants {
         trace!("Participant_{} joining", i);
-        let participantName = format!("{}{}", "Participant_", i);
+        let participantName = format!("{}{}", "participant_", i);
         let (participantSend, participantReceive) = coordinator.participant_join(&participantName);
         let participantPath = format!("{}/{}.log", logpathbase, participantName);
         trace!("Registering participant : {} Logs at : {}", i, participantPath);

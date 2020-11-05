@@ -212,8 +212,9 @@ impl Participant {
     /// 
     pub fn protocol(&mut self) {
         info!("Participant_{}::protocol", self.id);
+        let mut coordinatorExit = false;
         // TODO
-        while self.running.load(Ordering::SeqCst) {
+        while coordinatorExit == false {
             debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::SeqCst));
             let message = self.receiver.recv();
             if message.is_err() {
@@ -221,7 +222,7 @@ impl Participant {
             }
 
             let message = message.expect("Participant :: Error in receiving message from coordinator");
-            debug!("Participant_{}  : Message recieved :: {:?}", self.id, message);
+            debug!("Participant_{}  : Message received :: {:?}", self.id, message);
             match message.clone().mtype {
                 MessageType::ClientRequest => {
                     debug!("Participant_{}: Operation Received", self.id);
@@ -245,6 +246,8 @@ impl Participant {
                     self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
                 }
+
+                MessageType::CoordinatorExit => { coordinatorExit = true; }
 
                 _ => debug!("No match found")
             }

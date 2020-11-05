@@ -32,6 +32,7 @@ pub struct Client {
     successful: usize,
     failed: usize,
     unknown: usize,
+    coordinatorExit : bool,
     // ...
 }
 
@@ -68,6 +69,8 @@ impl Client {
             successful: 0,
             failed: 0,
             unknown: 0,
+            coordinatorExit: false
+
             // ...
         }
     }
@@ -78,7 +81,10 @@ impl Client {
     /// 
     pub fn wait_for_exit_signal(&mut self) {
         trace!("Client_{} waiting for exit signal", self.id);
-        while self.running.load(Ordering::SeqCst) {}
+        while self.coordinatorExit == false {
+            self.recv_result();
+            debug!("Client_{}::wait_for_exit_signal ", self.id);
+        }
 
         info!("Client_{}::Shutting Down", self.id);
 
@@ -102,10 +108,11 @@ impl Client {
                                                     format!("Client_{}", self.id),
                                                     request_no);
 
-        info!("client {} calling send...", self.id);
+
 
         let pmClone = pm.clone();
-        self.sender.send(pm);
+        self.sender.send_timeout(pm,Duration::from_millis(1000));
+        info!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pmClone);
 
         trace!("Client_{}::exit send_next_operation", self.id);
@@ -121,11 +128,18 @@ impl Client {
         trace!("Client_{}::recv_result", self.id);
 
         debug!("Client: Waiting for  response ");
-        let msg = self.receiver.recv().expect("Error in receiving response");
-
+        let msg_res = self.receiver.recv();
+        let msg;
+        if msg_res.is_ok() {
+            msg = msg_res.unwrap();
+        } else {
+            debug!("Client: Error is receiving response");
+            return;
+        }
         match msg.clone().mtype {
             MessageType::ClientResultAbort => { self.failed += 1; }
             MessageType::CoordinatorCommit => { self.successful += 1 }
+            MessageType::CoordinatorExit => {self.coordinatorExit=true;}
             _ => {}
         }
         debug!("Client: Received response {:?}", msg);
@@ -161,6 +175,10 @@ impl Client {
         // TODO
 
         for i in 0..n_requests {
+            // Do a recieve to see with coordinator has sent and exit message
+            if self.coordinatorExit == true {
+                break;
+            }
             self.send_next_operation();
             self.recv_result();
         }
@@ -169,5 +187,6 @@ impl Client {
 
         self.wait_for_exit_signal();
         //self.report_status();
+        info!("Client_{}::Shutting Down", self.id);
     }
 }

@@ -22,7 +22,7 @@ use std::time::Duration;
 use coordinator::rand::prelude::*;
 use message;
 use message::MessageType;
-use message::MessageType::{ClientRequest, ClientResultAbort, ClientResultCommit, CoordinatorAbort, CoordinatorCommit};
+use message::MessageType::{ClientRequest, ClientResultAbort, ClientResultCommit, CoordinatorAbort, CoordinatorCommit, CoordinatorExit};
 use message::ProtocolMessage;
 use message::RequestStatus;
 use oplog;
@@ -200,8 +200,8 @@ impl Coordinator {
     ///
     pub fn protocol(&mut self) {
         // TODO!
+
         while self.running.load(Ordering::SeqCst) {
-            trace!(" Coordinator Bool : {:?}", self.running.load(Ordering::SeqCst));
             /// Receive request from client
             let client_request_and_id = self.recv_request();
             let client_request = client_request_and_id.0;
@@ -293,8 +293,19 @@ impl Coordinator {
                 self.successful += 1;
             }
         }
-        self.report_status();
 
+        // Tell all participants and clients to shutdown
+        let participantsChannels = self.participantsChannels.clone();
+        for participantChannel in participantsChannels {
+            participantChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
+                                                                format!("{}","Coordinator"), 0));
+        }
+        let clientChannels = self.clientsChannels.clone();
+        for clientChannel in clientChannels {
+            clientChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
+                                                           format!("{}","Coordinator"), 0));
+        }
+        self.report_status();
         info!("Coordinator::Shutting Down");
     }
 }

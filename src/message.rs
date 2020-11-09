@@ -38,6 +38,8 @@ pub enum MessageType {
     ClientResultAbort,
     // result (success/fail) communicated to client
     CoordinatorExit,        // Coordinator telling client/participant about shut down
+
+    ParticipantRequestRecovery, // Participant asking coordinator status of message for recovery.
 }
 
 ///

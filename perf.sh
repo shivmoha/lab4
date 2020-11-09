@@ -3,9 +3,9 @@
 
 msgp=(1)
 oppa=(1)
-clients=(5 15 20)
-participants=(8 16)
-request=(1000)
+clients=(5 15 20 25 50)
+participants=(15 20)
+request=(100 150 200)
 
 
 for msg in "${msgp[@]}"
@@ -22,8 +22,9 @@ do
             echo "\n"
             echo "target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m run -v 0"
           	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m run -v 0 &
-          	sleep 5
-          	pid=`ps | grep cs380p-2pc | cut -d' ' -f2`
+          	sleep 2
+          	pid=`ps | grep cs380p-2pc | cut -d' ' -f1`
+          	echo $pid
           	kill -INT $pid &> /dev/null
           	sleep 1
           	echo "\n"

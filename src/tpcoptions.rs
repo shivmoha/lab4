@@ -57,6 +57,7 @@ impl TPCOptions {
         let default_success_prob_ops = "1.0";
         let default_success_prob_msg = "1.0";
 
+        //TODO change default log path
         let default_logpath = "/Users/shivam/tmp";
 
         let matches = App::new("cs380p-2pc")

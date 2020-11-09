@@ -8,6 +8,7 @@ extern crate stderrlog;
 
 use std::alloc::dealloc;
 use std::collections::HashMap;
+use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::atomic::AtomicI32;
@@ -16,8 +17,10 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
+use serde_json::map::Entry;
+
 use message::MessageType;
-use message::MessageType::{ParticipantVoteAbort, ParticipantVoteCommit};
+use message::MessageType::{ParticipantRequestRecovery, ParticipantVoteAbort, ParticipantVoteCommit};
 use message::ProtocolMessage;
 use message::RequestStatus;
 use oplog;
@@ -137,7 +140,7 @@ impl Participant {
         if x < self.msg_success_prob {
             result = self.send(pm);
         } else {
-            debug!("Message Dropped");
+            debug!("Message Dropped, Start Recovery");
             result = false;
         }
         result
@@ -204,6 +207,43 @@ impl Participant {
         trace!("participant_{} exiting", self.id);
     }
 
+
+    pub fn trigggerRecoveryProtocol(&mut self) {
+        let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
+        for (_, message) in self.log.arc().lock().unwrap().iter() {
+            let existing = recoveryTransactions.get(&message.txid);
+            if existing.is_none() {
+                recoveryTransactions.insert(message.txid, 1);
+            } else {
+                recoveryTransactions.insert(message.txid, existing.unwrap() + 1);
+            }
+        }
+        for (k, v) in recoveryTransactions.iter() {
+            if *v == 1 {
+                debug!("RECOVERY  Participant_{}:: {} -> {:?}", self.id, k, v);
+                self.send(ProtocolMessage::generate(ParticipantRequestRecovery, *k, format!("participant_{}", self.id), 0));
+                let message = self.receiver.recv();
+                if message.is_ok() {
+                    let message = message.expect("Participant :: Error in receiving message from coordinator");
+                    debug!("RECOVERY Participant_{}:: Received response from coordinator  {:?}", self.id, message);
+                    match message.clone().mtype {
+                        MessageType::CoordinatorCommit => {
+                            self.log.append(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
+                            debug!("RECOVERY Participant_{}: Received CoordinatorCommit", self.id);
+                        }
+                        MessageType::CoordinatorAbort => {
+                            self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
+                            debug!("RECOVERY Participant_{}: Received CoordinatorAbort", self.id);
+                        }
+                        _ => debug!("No match found")
+                    }
+                }
+            } // end of if (v==1)
+        }//end of for
+        //exit(1);
+    }
+
+
     ///
     /// protocol()
     /// Implements the participant side of the 2PC protocol
@@ -211,16 +251,20 @@ impl Participant {
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     /// 
     pub fn protocol(&mut self) {
-        info!("Participant_{}::protocol", self.id);
         let mut coordinatorExit = false;
-        // TODO
+        let mut requestProcessed = 0;
+
+        //Coming up, maybe from crash try recovery
+        self.trigggerRecoveryProtocol();
+
+
         while coordinatorExit == false {
-            debug!("Participant_{} : Bool : {:?}", self.id, self.running.load(Ordering::SeqCst));
+            // Receive client request
             let message = self.receiver.recv();
             if message.is_err() {
                 continue;
             }
-
+            requestProcessed += 1;
             let message = message.expect("Participant :: Error in receiving message from coordinator");
             debug!("Participant_{}  : Message received :: {:?}", self.id, message);
             match message.clone().mtype {
@@ -246,15 +290,13 @@ impl Participant {
                     self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
                 }
-
                 MessageType::CoordinatorExit => { coordinatorExit = true; }
-
                 _ => debug!("No match found")
             }
-        }
+        }//End of while
+
         // self.wait_for_exit_signal();
         self.report_status();
-
         info!("Participant_{}::Shutting Down", self.id);
     }
 }

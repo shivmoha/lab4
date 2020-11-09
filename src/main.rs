@@ -1,14 +1,19 @@
 extern crate clap;
+extern crate commitlog;
 extern crate ctrlc;
 #[macro_use]
 extern crate log;
+extern crate serde_json;
 extern crate stderrlog;
 
+use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
+
+use commitlog::*;
 
 use client::Client;
 use coordinator::Coordinator;
@@ -22,6 +27,7 @@ pub mod participant;
 pub mod client;
 pub mod checker;
 pub mod tpcoptions;
+pub mod comlog;
 
 ///
 /// register_clients()

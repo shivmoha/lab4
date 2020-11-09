@@ -170,8 +170,6 @@ impl Coordinator {
                 debug!("Coordinator:: Received request from client_{}", clientId);
                 result = Option::from(msg.unwrap());
                 return (result, clientId.parse::<usize>().unwrap());
-            } else {
-                debug!("Coordinator:: Try Receive Error");
             }
         }
         //self.clientsChannels[0].0.send(msg.clone().unwrap());
@@ -192,6 +190,15 @@ impl Coordinator {
         println!("coordinator:\tC:{}\tA:{}\tU:{}", self.successful, self.failed, self.unknown);
     }
 
+    pub fn send_recovery_response(&mut self, pm: ProtocolMessage, id: usize) {
+        for (_, message) in self.log.arc().lock().unwrap().iter() {
+            if message.txid == pm.txid {
+                debug!("Coordinator:: Sending recovery response to participant_{}", id);
+                self.participantsChannels[id].0.send(ProtocolMessage::generate(message.clone().mtype, message.clone().txid,
+                                                                               message.clone().senderid, message.clone().opid));
+            }
+        }
+    }
     ///
     /// protocol()
     /// Implements the coordinator side of the 2PC protocol
@@ -199,8 +206,6 @@ impl Coordinator {
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     ///
     pub fn protocol(&mut self) {
-        // TODO!
-
         while self.running.load(Ordering::SeqCst) {
             /// Receive request from client
             let client_request_and_id = self.recv_request();
@@ -211,17 +216,21 @@ impl Coordinator {
                 continue;
             }
             let client_request = client_request.expect("Error in receiving client request");
+
+            if client_request.clone().mtype == MessageType::ParticipantRequestRecovery {
+                self.send_recovery_response(client_request, clientId);
+                continue;
+            }
+
+
             let mut committed = 0;
             let mut aborted = 0;
             let mut unknown = 0;
-
             let mut i = 0;
             let participantsChannels = self.participantsChannels.clone();
             let participantsChannelsR = self.participantsChannels.clone();
 
-
-            /// PHASE: 1
-            // Send client request to participants
+            // PHASE: 1 Step 1 Send client request to participants
             for participantChannel in participantsChannels {
                 debug!("Coordinator:: Sending Request to Participant {}", i);
                 let client_request_participant = client_request.clone();
@@ -229,30 +238,34 @@ impl Coordinator {
                 i = i + 1;
             }
 
-            // Receive responses from all partitions
+            // PHASE: 1 Step 2 Receive responses from all participants
             i = 0;
             for participantChannel in participantsChannelsR {
-                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(10));
+                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(20));
                 // if the response is received before timeout, process the response
                 if msg_result.is_ok() {
                     let msg = msg_result.unwrap();
                     match msg.mtype {
-                        MessageType::ParticipantVoteCommit => committed += 1,
-                        MessageType::ParticipantVoteAbort => aborted += 1,
+                        MessageType::ParticipantVoteCommit => {
+                            debug!("Coordinator:: Participant_{} responded with commit", i);
+                            committed += 1
+                        }
+                        MessageType::ParticipantVoteAbort => {
+                            debug!("Coordinator:: Participant_{} responded with abort", i);
+                            aborted += 1
+                        }
                         _ => {}
                     }
-                    debug!("Coordinator:: Reading Participant_{} Response {:?}", i, msg);
                 } else {
                     // if the response is not received before timeout, mark the status as unknown
-                    debug!("Coordinator:: Reading Participant_{} Response Timeout", i);
+                    debug!("Coordinator:: Participant_{} time-out, will kill the threads and trigger recovery", i);
                     unknown += 1;
                 }
                 i = i + 1;
             }
 
 
-            /// PHASE: 2
-            /// Someone voted abort or didn't respond,  send abort to all participants
+            // PHASE: 2 Someone voted abort or didn't respond,  send abort to all participants
             if aborted > 0 || unknown > 0 {
                 self.log.append(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
                 debug!("Someone voted abort or is unknown,  send abort to all participants");
@@ -260,11 +273,8 @@ impl Coordinator {
                 for participantChannel in participantsChannels {
                     participantChannel.0.send(ProtocolMessage::generate(CoordinatorAbort, client_request.clone().txid,
                                                                         client_request.clone().senderid, client_request.clone().opid));
-                    // self.send(&participantChannel.0, ProtocolMessage::generate(CoordinatorAbort, client_request.clone().txid,
-                    // client_request.clone().senderid, client_request.clone().opid));
                     debug!("Coordinator:: Sending Abort to Participant");
                 }
-                //TODO: Send response to client
                 debug!("Coordinator:: Sending Abort to Client : START");
                 self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
                                                                                 client_request.clone().senderid, client_request.clone().opid));
@@ -279,14 +289,10 @@ impl Coordinator {
                 for participantChannel in participantsChannels {
                     participantChannel.0.send(ProtocolMessage::generate(CoordinatorCommit, client_request.clone().txid,
                                                                         client_request.clone().senderid, client_request.clone().opid));
-                    // self.send(&participantChannel.0, ProtocolMessage::generate(CoordinatorCommit, client_request.clone().txid,client_request.clone().senderid,
-                    // client_request.clone().opid));
                     debug!("Coordinator:: Sending Commit to Participant {}", i);
                     i = i + 1;
                 }
-                //TODO: Send response to client
                 debug!("Coordinator:: Sending Commit to client {:?}", self.clientsChannels[0].0.capacity());
-
                 self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
                                                                                 client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Commit to client done");
@@ -298,12 +304,12 @@ impl Coordinator {
         let participantsChannels = self.participantsChannels.clone();
         for participantChannel in participantsChannels {
             participantChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
-                                                                format!("{}","Coordinator"), 0));
+                                                                format!("{}", "Coordinator"), 0));
         }
         let clientChannels = self.clientsChannels.clone();
         for clientChannel in clientChannels {
             clientChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
-                                                           format!("{}","Coordinator"), 0));
+                                                           format!("{}", "Coordinator"), 0));
         }
         self.report_status();
         info!("Coordinator::Shutting Down");

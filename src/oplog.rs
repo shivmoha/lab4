@@ -54,7 +54,8 @@ impl OpLog {
             path: scopy,
             lf: tlf,
         }
-    }    
+    }
+
     pub fn append(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
         let lck = Arc::clone(&self.log_arc);
         let mut log = lck.lock().unwrap();
@@ -66,12 +67,14 @@ impl OpLog {
         self.lf.flush().unwrap();
         log.insert(id, pm);
     }
+
     pub fn read(&mut self, offset: &i32) -> message::ProtocolMessage {
         let lck = Arc::clone(&self.log_arc);
         let log = lck.lock().unwrap();
         let pm = log[&offset].clone();
         pm
     }
+
     pub fn arc(&self) -> Arc<Mutex<HashMap<i32, message::ProtocolMessage>>> {
         Arc::clone(&self.log_arc)
     }

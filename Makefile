@@ -8,4 +8,4 @@ build:
 
 run:
 	RUST_BACKTRACE=1 RUSTFLAGS=-Awarnings cargo build
-	target/debug/cs380p-2pc -S 0.01 -s 0.99 -c 2 -p 1 -r 2 -m $(M) -v 3
+	target/debug/cs380p-2pc  -S 0.75 -s 1 -c 50 -p 20 -r 150 -m $(M) -v 3

@@ -160,22 +160,17 @@ impl Participant {
     /// 
     pub fn perform_operation(&mut self, request: &Option<ProtocolMessage>) -> bool {
         trace!("participant::perform_operation");
-
         let mut result: RequestStatus = RequestStatus::Unknown;
         let request_message = request.clone().expect("Error in performing operation");
-
         let x: f64 = random();
         //thread::sleep(Duration::from_millis(4000));
         if x > self.op_success_prob {
-            // TODO: fail the request
             self.log.append(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Aborted;
         } else {
-            // TODO: request succeeds!
             self.log.append(ParticipantVoteCommit, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Committed;
         };
-
         trace!("exit participant::perform_operation");
         result == RequestStatus::Committed
     }
@@ -186,7 +181,6 @@ impl Participant {
     /// transaction requests made by this coordinator before exiting. 
     /// 
     pub fn report_status(&mut self) {
-
         // TODO: maintain actual stats!
         let global_successful_ops: usize = 0;
         let global_failed_ops: usize = 0;
@@ -201,14 +195,13 @@ impl Participant {
     /// 
     pub fn wait_for_exit_signal(&mut self) {
         trace!("participant_{} waiting for exit signal", self.id);
-
         // TODO
-
         trace!("participant_{} exiting", self.id);
     }
 
 
-    pub fn trigggerRecoveryProtocol(&mut self) {
+    pub fn triggerRecoveryProtocol(&mut self) {
+        // Map of transaction_id to count
         let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
         for (_, message) in self.log.arc().lock().unwrap().iter() {
             let existing = recoveryTransactions.get(&message.txid);
@@ -240,9 +233,7 @@ impl Participant {
                 }
             } // end of if (v==1)
         }//end of for
-        //exit(1);
     }
-
 
     ///
     /// protocol()
@@ -255,7 +246,7 @@ impl Participant {
         let mut requestProcessed = 0;
 
         //Coming up, maybe from crash try recovery
-        self.trigggerRecoveryProtocol();
+        self.triggerRecoveryProtocol();
 
 
         while coordinatorExit == false {

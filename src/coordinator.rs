@@ -217,11 +217,11 @@ impl Coordinator {
             }
             let client_request = client_request.expect("Error in receiving client request");
 
+            //Recovery request
             if client_request.clone().mtype == MessageType::ParticipantRequestRecovery {
                 self.send_recovery_response(client_request, clientId);
                 continue;
             }
-
 
             let mut committed = 0;
             let mut aborted = 0;
@@ -234,7 +234,7 @@ impl Coordinator {
             for participantChannel in participantsChannels {
                 debug!("Coordinator:: Sending Request to Participant {}", i);
                 let client_request_participant = client_request.clone();
-                let result_of_send = self.send(&participantChannel.0, client_request_participant);
+                self.send(&participantChannel.0, client_request_participant);
                 i = i + 1;
             }
 

@@ -32,7 +32,7 @@ pub struct Client {
     successful: usize,
     failed: usize,
     unknown: usize,
-    coordinatorExit : bool,
+    coordinatorExit: bool,
     // ...
 }
 
@@ -69,7 +69,7 @@ impl Client {
             successful: 0,
             failed: 0,
             unknown: 0,
-            coordinatorExit: false
+            coordinatorExit: false,
 
             // ...
         }
@@ -85,9 +85,7 @@ impl Client {
             self.recv_result();
             debug!("Client_{}::wait_for_exit_signal ", self.id);
         }
-
         info!("Client_{}::Shutting Down", self.id);
-
         trace!("Client_{} exiting", self.id);
     }
 
@@ -97,24 +95,16 @@ impl Client {
     /// 
     pub fn send_next_operation(&mut self) {
         trace!("Client_{}::send_next_operation", self.id);
-
         // create a new request with a unique TXID.         
         let request_no: i32 = 0; // TODO--choose another number!
         let txid = TXID_COUNTER.fetch_add(1, Ordering::SeqCst);
-
         info!("Client {} request({})->txid:{} called", self.id, request_no, txid);
-        let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest,
-                                                    txid,
-                                                    format!("Client_{}", self.id),
-                                                    request_no);
-
-
-
+        let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, txid,
+                                                    format!("Client_{}", self.id), request_no);
         let pmClone = pm.clone();
-        self.sender.send_timeout(pm,Duration::from_millis(1000));
+        self.sender.send(pm);
         info!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pmClone);
-
         trace!("Client_{}::exit send_next_operation", self.id);
     }
 
@@ -139,7 +129,7 @@ impl Client {
         match msg.clone().mtype {
             MessageType::ClientResultAbort => { self.failed += 1; }
             MessageType::CoordinatorCommit => { self.successful += 1 }
-            MessageType::CoordinatorExit => {self.coordinatorExit=true;}
+            MessageType::CoordinatorExit => { self.coordinatorExit = true; }
             _ => {}
         }
         debug!("Client: Received response {:?}", msg);

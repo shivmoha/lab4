@@ -183,10 +183,6 @@ impl Coordinator {
     /// transaction requests made by this coordinator before exiting.
     ///
     pub fn report_status(&mut self) {
-        let successful_ops: usize = 0; // TODO!
-        let failed_ops: usize = 0; // TODO!
-        let unknown_ops: usize = 0; // TODO!
-        // println!("coordinator:\tC:{}\tA:{}\tU:{}", successful_ops, failed_ops, unknown_ops);
         println!("coordinator:\tC:{}\tA:{}\tU:{}", self.successful, self.failed, self.unknown);
     }
 
@@ -216,7 +212,6 @@ impl Coordinator {
                 continue;
             }
             let client_request = client_request.expect("Error in receiving client request");
-
             //Recovery request
             if client_request.clone().mtype == MessageType::ParticipantRequestRecovery {
                 self.send_recovery_response(client_request, clientId);
@@ -241,7 +236,7 @@ impl Coordinator {
             // PHASE: 1 Step 2 Receive responses from all participants
             i = 0;
             for participantChannel in participantsChannelsR {
-                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(20));
+                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(200));
                 // if the response is received before timeout, process the response
                 if msg_result.is_ok() {
                     let msg = msg_result.unwrap();

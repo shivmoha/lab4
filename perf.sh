@@ -26,7 +26,7 @@ do
           	pid=`ps | grep cs380p-2pc | cut -d' ' -f1`
           	echo $pid
           	kill -INT $pid &> /dev/null
-          	sleep 1
+          	sleep 10
           	echo "\n"
           	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m check -v 0
           	RC=$?

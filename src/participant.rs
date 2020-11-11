@@ -285,7 +285,6 @@ impl Participant {
                 _ => debug!("No match found")
             }
         }//End of while
-
         // self.wait_for_exit_signal();
         self.report_status();
         info!("Participant_{}::Shutting Down", self.id);

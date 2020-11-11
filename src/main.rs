@@ -59,7 +59,7 @@ pub mod comlog;
 fn register_clients(
     coordinator: &mut Coordinator,
     n_clients: i32,
-    logpathbase: &String,
+    log_path_base: &String,
     running: &Arc<AtomicBool>) -> Vec<Client> {
     let mut clients = vec![];
     // register clients with coordinator (set up communication channels and sync objects)
@@ -67,7 +67,7 @@ fn register_clients(
     for c in 0..n_clients {
         let clientName = format!("{}{}", "Client_", c);
         let (clientSend, clientReceive) = coordinator.client_join(&clientName);
-        let clientLogPath = format!("{}/{}", logpathbase, clientName);
+        let clientLogPath = format!("{}/{}", log_path_base, clientName);
         trace!("Registering client : {} Logs at : {}", c, clientLogPath);
         clients.push(Client::new(c, String::new(), clientSend, clientReceive, running.clone()));
     }
@@ -105,7 +105,7 @@ fn register_clients(
 fn register_participants(
     coordinator: &mut Coordinator,
     n_participants: i32,
-    logpathbase: &String,
+    log_path_base: &String,
     running: &Arc<AtomicBool>,
     success_prob_ops: f64,
     success_prob_msg: f64) -> Vec<Participant> {
@@ -116,7 +116,7 @@ fn register_participants(
         trace!("Participant_{} joining", i);
         let participantName = format!("{}{}", "participant_", i);
         let (participantSend, participantReceive) = coordinator.participant_join(&participantName);
-        let participantPath = format!("{}/{}.log", logpathbase, participantName);
+        let participantPath = format!("{}/{}.log", log_path_base, participantName);
         trace!("Registering participant : {} Logs at : {}", i, participantPath);
         participants.push(Participant::new(i, String::new(), participantSend, participantReceive, participantPath, running.clone(),
                                            success_prob_ops, success_prob_msg));
@@ -141,7 +141,6 @@ fn launch_clients(
     clients: Vec<Client>,
     n_requests: i32,
     handles: &mut Vec<JoinHandle<()>>) -> &mut Vec<JoinHandle<()>> {
-
     // do something to create threads for client 'processes'
     // the mutable handles parameter allows you to return 
     // more than one wait handle to the caller to join on.
@@ -177,10 +176,8 @@ fn launch_participants(
             // thread::sleep(Duration::from_millis(4000));
             participant.protocol();
         });
-
         handles.push(handle);
     }
-
     return handles;
     // do something to create threads for participant 'processes'
     // the mutable handles parameter allows you to return 

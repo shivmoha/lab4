@@ -99,6 +99,11 @@ impl TPCOptions {
                 .required(false)
                 .takes_value(true)
                 .help("mode--\"run\" runs 2pc, \"check\" checks logs produced by previous run"))
+            .arg(Arg::with_name("logpath")
+                .short("l")
+                .required(false)
+                .takes_value(true)
+                .help("logpath--\"path\""))
             .get_matches();
 
         let _mode = matches.value_of("mode").unwrap_or(default_mode);

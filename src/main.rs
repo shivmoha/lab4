@@ -1,5 +1,5 @@
 extern crate clap;
-extern crate commitlog;
+//extern crate commitlog;
 extern crate ctrlc;
 #[macro_use]
 extern crate log;
@@ -13,7 +13,7 @@ use std::thread;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 
-use commitlog::*;
+//use commitlog::*;
 
 use client::Client;
 use coordinator::Coordinator;

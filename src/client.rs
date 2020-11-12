@@ -101,7 +101,7 @@ impl Client {
         let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, txid,
                                                     format!("Client_{}", self.id), request_no);
         let pmClone = pm.clone();
-        self.sender.send_timeout(pm,Duration::from_millis(5000));
+        self.sender.send_timeout(pm,Duration::from_millis(500));
         info!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pmClone);
         trace!("Client_{}::exit send_next_operation", self.id);

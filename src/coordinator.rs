@@ -161,7 +161,6 @@ impl Coordinator {
         let mut result = Option::None;
         assert!(self.state == CoordinatorState::Quiescent);
         trace!("coordinator::recv_request...");
-        //debug!("Coordinator:: Waiting for client request");
         let clientChannels = self.clientsChannels.clone();
         for clientChannel in clientChannels {
             let msg = clientChannel.1.try_recv();
@@ -172,7 +171,6 @@ impl Coordinator {
                 return (result, clientId.parse::<usize>().unwrap());
             }
         }
-        //self.clientsChannels[0].0.send(msg.clone().unwrap());
         trace!("leaving coordinator::recv_request");
         return (result, 0);
     }

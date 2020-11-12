@@ -245,7 +245,7 @@ impl Participant {
         let mut coordinatorExit = false;
         let mut requestProcessed = 0;
 
-        //Coming up, maybe from crash try recovery
+        //Coming up, maybe from crash, try recovery
         self.triggerRecoveryProtocol();
 
 

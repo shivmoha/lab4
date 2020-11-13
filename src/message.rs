@@ -100,4 +100,9 @@ impl ProtocolMessage {
         let pm: ProtocolMessage = serde_json::from_value(data).unwrap();
         pm
     }
+
+    pub fn to_string(pm: &ProtocolMessage) -> String {
+        let pm: String = serde_json::to_string(pm).unwrap();
+        pm
+    }
 }

@@ -1,11 +1,12 @@
 all: clean run
 
 clean:
-	rm -f /Users/shivam/tmp/*log
+	rm -rf ./tmp/*log
+	rm -rf ./tmp/coordinator.log
 
 build:
 	RUST_BACKTRACE=1 RUSTFLAGS=-Awarnings cargo run
 
 run:
 	RUST_BACKTRACE=1 RUSTFLAGS=-Awarnings cargo build
-	target/debug/cs380p-2pc  -S 0.75 -s 1 -c 50 -p 20 -r 150 -m $(M) -v 0 -l /Users/shivam/tmp
+	target/debug/cs380p-2pc  -S 0.95 -s 1 -c 5 -p 5 -r 5 -m $(M) -v 3 -l ./tmp

@@ -58,7 +58,7 @@ impl TPCOptions {
         let default_success_prob_msg = "1.0";
 
         //TODO change default log path
-        let default_logpath = "/Users/shivam/tmp";
+        let default_logpath = "./tmp";
 
         let matches = App::new("cs380p-2pc")
             .version("0.1.0")
@@ -118,6 +118,7 @@ impl TPCOptions {
         match _mode.as_ref() {
             "run" => {}
             "check" => {}
+            "cus" => {}
             _ => panic!("unknown execution mode requested!"),
         }
 

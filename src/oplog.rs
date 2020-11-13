@@ -26,14 +26,14 @@ impl OpLog {
         let lck = Mutex::new(l);
         let arc = Arc::new(lck);
         OpLog {
-            seqno: 0,            
+            seqno: 0,
             log_arc: arc,
             path: fpath.to_string(),
             lf: File::create(fpath).unwrap(),
         }
     }
     pub fn from_file(fpath: String) -> OpLog {
-        let seqno = 0;        
+        let seqno = 0;
         let mut l = HashMap::new();
         let scopy = fpath.clone();
         let tlf = File::open(fpath).unwrap();
@@ -49,32 +49,29 @@ impl OpLog {
         let lck = Mutex::new(l);
         let arc = Arc::new(lck);
         OpLog {
-            seqno: seqno,            
+            seqno: seqno,
             log_arc: arc,
             path: scopy,
             lf: tlf,
         }
     }
-
     pub fn append(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
         let lck = Arc::clone(&self.log_arc);
         let mut log = lck.lock().unwrap();
         self.seqno += 1;
         let id = self.seqno;
-        let pm = message::ProtocolMessage::generate(t, tid, sender, op);        
-        serde_json::to_writer(&mut self.lf, &pm).unwrap();    
+        let pm = message::ProtocolMessage::generate(t, tid, sender, op);
+        serde_json::to_writer(&mut self.lf, &pm).unwrap();
         writeln!(&mut self.lf).unwrap();
         self.lf.flush().unwrap();
         log.insert(id, pm);
     }
-
     pub fn read(&mut self, offset: &i32) -> message::ProtocolMessage {
         let lck = Arc::clone(&self.log_arc);
         let log = lck.lock().unwrap();
         let pm = log[&offset].clone();
         pm
     }
-
     pub fn arc(&self) -> Arc<Mutex<HashMap<i32, message::ProtocolMessage>>> {
         Arc::clone(&self.log_arc)
     }

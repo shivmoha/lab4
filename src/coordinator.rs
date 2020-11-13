@@ -19,6 +19,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
+use comlog::CLog;
 use coordinator::rand::prelude::*;
 use message;
 use message::MessageType;
@@ -30,6 +31,7 @@ use oplog;
 use self::crossbeam_channel::TryRecvError;
 use self::rand::distributions::Open01;
 use self::rand::random;
+use oplog::OpLog;
 
 /// CoordinatorState
 /// States for 2PC state machine
@@ -46,7 +48,7 @@ pub enum CoordinatorState {
 #[derive(Debug)]
 pub struct Coordinator {
     state: CoordinatorState,
-    log: oplog::OpLog,
+    log: OpLog,
     op_success_prob: f64,
     participantsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
     clientsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
@@ -82,9 +84,10 @@ impl Coordinator {
         logpath: String,
         r: Arc<AtomicBool>,
         success_prob: f64) -> Coordinator {
+
         Coordinator {
             state: CoordinatorState::Quiescent,
-            log: oplog::OpLog::new(logpath),
+            log: OpLog::new(logpath),
             op_success_prob: success_prob,
             participantsChannels: vec![],
             clientsChannels: vec![],
@@ -185,13 +188,13 @@ impl Coordinator {
     }
 
     pub fn send_recovery_response(&mut self, pm: ProtocolMessage, id: usize) {
-        for (_, message) in self.log.arc().lock().unwrap().iter() {
-            if message.txid == pm.txid {
-                debug!("Coordinator:: Sending recovery response to participant_{}", id);
-                self.participantsChannels[id].0.send(ProtocolMessage::generate(message.clone().mtype, message.clone().txid,
-                                                                               message.clone().senderid, message.clone().opid));
-            }
-        }
+        // for (_, message) in self.log.arc().lock().unwrap().iter() {
+        //     if message.txid == pm.txid {
+        //         debug!("Coordinator:: Sending recovery response to participant_{}", id);
+        //         self.participantsChannels[id].0.send(ProtocolMessage::generate(message.clone().mtype, message.clone().txid,
+        //                                                                        message.clone().senderid, message.clone().opid));
+        //     }
+        // }
     }
     ///
     /// protocol()
@@ -199,14 +202,17 @@ impl Coordinator {
     /// HINT: if the simulation ends early, don't keep handling requests!
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     ///
+
     pub fn protocol(&mut self) {
+        let mut lt = 0;
         while self.running.load(Ordering::SeqCst) {
-            /// Receive request from client
+
+            // Receive request from client
             let client_request_and_id = self.recv_request();
             let client_request = client_request_and_id.0;
             let clientId = client_request_and_id.1;
             if client_request.is_none() {
-                debug!("Coordinator:: None received in request");
+                //debug!("Coordinator:: None received in request");
                 continue;
             }
             let client_request = client_request.expect("Error in receiving client request");
@@ -291,8 +297,12 @@ impl Coordinator {
                 debug!("Coordinator:: Sending Commit to client done");
                 self.successful += 1;
             }
-        }
+           // self.log.read(lt);
+            lt = lt + 1;
+        }//end of while
 
+        //debug!("Coordinator: READING FILE");
+        //CLog::read_file("./tmp/coordinator.log".parse().unwrap());
         // Tell all participants and clients to shutdown
         let participantsChannels = self.participantsChannels.clone();
         for participantChannel in participantsChannels {

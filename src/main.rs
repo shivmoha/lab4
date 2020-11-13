@@ -1,5 +1,5 @@
 extern crate clap;
-//extern crate commitlog;
+extern crate commitlog;
 extern crate ctrlc;
 #[macro_use]
 extern crate log;
@@ -13,12 +13,14 @@ use std::thread;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 
-//use commitlog::*;
+use commitlog::*;
 
 use client::Client;
 use coordinator::Coordinator;
 use message::MessageType::ClientRequest;
 use participant::Participant;
+use commitlog::ReadError::CorruptLog;
+use comlog::CLog;
 
 pub mod message;
 pub mod oplog;
@@ -28,6 +30,7 @@ pub mod client;
 pub mod checker;
 pub mod tpcoptions;
 pub mod comlog;
+pub mod commit_log_checker;
 
 ///
 /// register_clients()
@@ -264,6 +267,10 @@ fn main() {
     match opts.mode.as_ref() {
         "run" => run(&opts),
         "check" => checker::check_last_run(opts.num_clients,
+                                           opts.num_requests,
+                                           opts.num_participants,
+                                           &opts.logpath.to_string()),
+        "cus" => commit_log_checker::check_last_run(opts.num_clients,
                                            opts.num_requests,
                                            opts.num_participants,
                                            &opts.logpath.to_string()),

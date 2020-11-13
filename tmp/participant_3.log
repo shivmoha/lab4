@@ -1,0 +1,6 @@
+{"mtype":"ParticipantVoteCommit","uid":10,"txid":2,"senderid":"Client_2","opid":0}
+{"mtype":"CoordinatorCommit","uid":25,"txid":2,"senderid":"Client_2","opid":0}
+{"mtype":"ParticipantVoteCommit","uid":35,"txid":1,"senderid":"Client_0","opid":0}
+{"mtype":"CoordinatorAbort","uid":48,"txid":1,"senderid":"Client_0","opid":0}
+{"mtype":"ParticipantVoteCommit","uid":58,"txid":4,"senderid":"Client_1","opid":0}
+{"mtype":"CoordinatorAbort","uid":71,"txid":4,"senderid":"Client_1","opid":0}

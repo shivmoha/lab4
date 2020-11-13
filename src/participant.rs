@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use serde_json::map::Entry;
 
+use comlog::CLog;
 use message::MessageType;
 use message::MessageType::{ParticipantRequestRecovery, ParticipantVoteAbort, ParticipantVoteCommit};
 use message::ProtocolMessage;
@@ -27,6 +28,7 @@ use oplog;
 use participant::rand::prelude::*;
 
 use self::rand::random;
+use oplog::OpLog;
 
 ///
 /// ParticipantState
@@ -47,7 +49,7 @@ pub enum ParticipantState {
 pub struct Participant {
     id: i32,
     state: ParticipantState,
-    log: oplog::OpLog,
+    log: OpLog,
     op_success_prob: f64,
     msg_success_prob: f64,
     sender: crossbeam_channel::Sender<ProtocolMessage>,
@@ -88,9 +90,10 @@ impl Participant {
         r: Arc<AtomicBool>,
         f_success_prob_ops: f64,
         f_success_prob_msg: f64) -> Participant {
+
         Participant {
             id: i,
-            log: oplog::OpLog::new(logpath),
+            log: OpLog::new(logpath),
             op_success_prob: f_success_prob_ops,
             msg_success_prob: f_success_prob_msg,
             state: ParticipantState::Quiescent,
@@ -202,37 +205,37 @@ impl Participant {
 
     pub fn triggerRecoveryProtocol(&mut self) {
         // Map of transaction_id to count
-        let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
-        for (_, message) in self.log.arc().lock().unwrap().iter() {
-            let existing = recoveryTransactions.get(&message.txid);
-            if existing.is_none() {
-                recoveryTransactions.insert(message.txid, 1);
-            } else {
-                recoveryTransactions.insert(message.txid, existing.unwrap() + 1);
-            }
-        }
-        for (k, v) in recoveryTransactions.iter() {
-            if *v == 1 {
-                debug!("RECOVERY  Participant_{}:: {} -> {:?}", self.id, k, v);
-                self.send(ProtocolMessage::generate(ParticipantRequestRecovery, *k, format!("participant_{}", self.id), 0));
-                let message = self.receiver.recv();
-                if message.is_ok() {
-                    let message = message.expect("Participant :: Error in receiving message from coordinator");
-                    debug!("RECOVERY Participant_{}:: Received response from coordinator  {:?}", self.id, message);
-                    match message.clone().mtype {
-                        MessageType::CoordinatorCommit => {
-                            self.log.append(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
-                            debug!("RECOVERY Participant_{}: Received CoordinatorCommit", self.id);
-                        }
-                        MessageType::CoordinatorAbort => {
-                            self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
-                            debug!("RECOVERY Participant_{}: Received CoordinatorAbort", self.id);
-                        }
-                        _ => debug!("No match found")
-                    }
-                }
-            } // end of if (v==1)
-        }//end of for
+        // let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
+        // for (_, message) in self.log.arc().lock().unwrap().iter() {
+        //     let existing = recoveryTransactions.get(&message.txid);
+        //     if existing.is_none() {
+        //         recoveryTransactions.insert(message.txid, 1);
+        //     } else {
+        //         recoveryTransactions.insert(message.txid, existing.unwrap() + 1);
+        //     }
+        // }
+        // for (k, v) in recoveryTransactions.iter() {
+        //     if *v == 1 {
+        //         debug!("RECOVERY  Participant_{}:: {} -> {:?}", self.id, k, v);
+        //         self.send(ProtocolMessage::generate(ParticipantRequestRecovery, *k, format!("participant_{}", self.id), 0));
+        //         let message = self.receiver.recv();
+        //         if message.is_ok() {
+        //             let message = message.expect("Participant :: Error in receiving message from coordinator");
+        //             debug!("RECOVERY Participant_{}:: Received response from coordinator  {:?}", self.id, message);
+        //             match message.clone().mtype {
+        //                 MessageType::CoordinatorCommit => {
+        //                     self.log.append(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
+        //                     debug!("RECOVERY Participant_{}: Received CoordinatorCommit", self.id);
+        //                 }
+        //                 MessageType::CoordinatorAbort => {
+        //                     self.log.append(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
+        //                     debug!("RECOVERY Participant_{}: Received CoordinatorAbort", self.id);
+        //                 }
+        //                 _ => debug!("No match found")
+        //             }
+        //         }
+        //     } // end of if (v==1)
+        // }//end of for
     }
 
     ///
@@ -248,7 +251,7 @@ impl Participant {
         //Coming up, maybe from crash, try recovery
         self.triggerRecoveryProtocol();
 
-
+        let mut lt = 0;
         while coordinatorExit == false {
             // Receive client request
             let message = self.receiver.recv();
@@ -284,7 +287,14 @@ impl Participant {
                 MessageType::CoordinatorExit => { coordinatorExit = true; }
                 _ => debug!("No match found")
             }
+
+           // println!("Participant_{} :: Calling log {}", self.id, lt);
+            //self.log.read(lt);
+            lt = lt + 1;
         }//End of while
+
+        debug!("Participant_{}: READING FILE",self.id);
+        //CLog::read_file(format!("./tmp/participant_{}.log",self.id));
         // self.wait_for_exit_signal();
         self.report_status();
         info!("Participant_{}::Shutting Down", self.id);

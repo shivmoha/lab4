@@ -14,13 +14,13 @@ use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 
 use commitlog::*;
+use commitlog::ReadError::CorruptLog;
 
 use client::Client;
+use comlog::CLog;
 use coordinator::Coordinator;
 use message::MessageType::ClientRequest;
 use participant::Participant;
-use commitlog::ReadError::CorruptLog;
-use comlog::CLog;
 
 pub mod message;
 pub mod oplog;
@@ -111,7 +111,8 @@ fn register_participants(
     log_path_base: &String,
     running: &Arc<AtomicBool>,
     success_prob_ops: f64,
-    success_prob_msg: f64) -> Vec<Participant> {
+    success_prob_msg: f64,
+    logType: bool) -> Vec<Participant> {
     let mut participants = vec![];
     // register participants with coordinator (set up communication channels and sync objects)
     // add client to the vector and return the vector.
@@ -119,10 +120,10 @@ fn register_participants(
         trace!("Participant_{} joining", i);
         let participantName = format!("{}{}", "participant_", i);
         let (participantSend, participantReceive) = coordinator.participant_join(&participantName);
-        let participantPath = format!("{}/{}.log", log_path_base, participantName);
-        trace!("Registering participant : {} Logs at : {}", i, participantPath);
-        participants.push(Participant::new(i, String::new(), participantSend, participantReceive, participantPath, running.clone(),
-                                           success_prob_ops, success_prob_msg));
+        trace!("Registering participant : {}", i);
+        participants.push(Participant::new(i, String::new(), participantSend,
+                                           participantReceive, log_path_base.to_string(), running.clone(),
+                                           success_prob_ops, success_prob_msg, logType));
     }
     return participants;
 }
@@ -221,25 +222,22 @@ fn run(opts: &tpcoptions::TPCOptions) {
     }).expect("Error setting signal handler!");
 
     // create a coordinator, create and register clients and participants
-    // launch threads for all, and wait on handles. 
-    let cpath = format!("{}/{}", opts.logpath, "coordinator.log");
-    debug!("{}", cpath);
+    // launch threads for all, and wait on handles.
     let mut coordinator: Coordinator;
     let clients: Vec<Client>;
     let participants: Vec<Participant>;
 
-    coordinator = Coordinator::new(cpath, running.clone(), opts.success_probability_ops);
+    coordinator = Coordinator::new(opts.logpath.clone(), running.clone(), opts.success_probability_ops,
+                                   opts.logtype, opts.num_clients * opts.num_requests);
     clients = register_clients(&mut coordinator, opts.num_clients, &opts.logpath, &running);
     participants = register_participants(&mut coordinator, opts.num_participants, &opts.logpath, &running,
-                                         opts.success_probability_ops, opts.success_probability_msg);
-
+                                         opts.success_probability_ops, opts.success_probability_msg, opts.logtype);
 
     let coordinatorHandle = thread::spawn(move || {
         coordinator.protocol();
     });
     launch_clients(clients, opts.num_requests, &mut clientHandles);
     launch_participants(participants, &mut participantHandles);
-
 
     // wait for clients, participants, and coordinator here...
     for participant in participantHandles {
@@ -251,9 +249,6 @@ fn run(opts: &tpcoptions::TPCOptions) {
     }
 }
 
-///
-/// main()
-/// 
 fn main() {
     let opts = tpcoptions::TPCOptions::new();
     stderrlog::new()
@@ -270,10 +265,10 @@ fn main() {
                                            opts.num_requests,
                                            opts.num_participants,
                                            &opts.logpath.to_string()),
-        "cus" => commit_log_checker::check_last_run(opts.num_clients,
-                                           opts.num_requests,
-                                           opts.num_participants,
-                                           &opts.logpath.to_string()),
+        "chkcom" => commit_log_checker::check_last_run(opts.num_clients,
+                                                       opts.num_requests,
+                                                       opts.num_participants,
+                                                       &opts.logpath.to_string()),
         _ => panic!("unknown mode"),
     }
 }

@@ -38,7 +38,10 @@ pub struct TPCOptions {
     // integer verbosity level. experiment with 0 (default) to 5 (fire-hose of output)
     pub mode: String,
     // "run" or "check"
-    pub logpath: String,                // directory for client, participant, and coordinator logs
+    pub logpath: String,
+    // directory for client, participant, and coordinator logs
+
+    pub logtype: bool, // define type of logger: true means use commitlog
 }
 
 impl TPCOptions {
@@ -56,9 +59,8 @@ impl TPCOptions {
         let default_mode = "run";
         let default_success_prob_ops = "1.0";
         let default_success_prob_msg = "1.0";
-
-        //TODO change default log path
         let default_logpath = "./tmp";
+
 
         let matches = App::new("cs380p-2pc")
             .version("0.1.0")
@@ -104,6 +106,10 @@ impl TPCOptions {
                 .required(false)
                 .takes_value(true)
                 .help("logpath--\"path\""))
+            .arg(Arg::with_name("logtype")
+                .short("t")
+                .required(false)
+                .help("logtype"))
             .get_matches();
 
         let _mode = matches.value_of("mode").unwrap_or(default_mode);
@@ -114,11 +120,12 @@ impl TPCOptions {
         let n_requests = matches.value_of("num_requests").unwrap_or(default_n_requests).parse::<i32>().unwrap();
         let _verbosity = matches.value_of("verbose").unwrap_or(default_verbosity).parse::<usize>().unwrap();
         let _logpath = matches.value_of("logpath").unwrap_or(default_logpath);
+        let _logtype = matches.is_present("logtype");
 
         match _mode.as_ref() {
             "run" => {}
             "check" => {}
-            "cus" => {}
+            "chkcom" => {}
             _ => panic!("unknown execution mode requested!"),
         }
 
@@ -131,6 +138,7 @@ impl TPCOptions {
             verbosity: _verbosity,
             mode: _mode.to_string(),
             logpath: _logpath.to_string(),
+            logtype: _logtype,
         }
     }
 }

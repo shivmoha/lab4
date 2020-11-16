@@ -17,12 +17,8 @@ use message;
 use message::{MessageType, ProtocolMessage};
 use message::RequestStatus;
 
-// static counter for getting unique TXID numbers
 static TXID_COUNTER: AtomicI32 = AtomicI32::new(1);
 
-// client state and 
-// primitives for communicating with 
-// the coordinator
 #[derive(Debug)]
 pub struct Client {
     pub id: i32,
@@ -33,7 +29,6 @@ pub struct Client {
     failed: usize,
     unknown: usize,
     coordinatorExit: bool,
-    // ...
 }
 
 ///
@@ -70,7 +65,6 @@ impl Client {
             failed: 0,
             unknown: 0,
             coordinatorExit: false,
-            // ...
         }
     }
 
@@ -81,8 +75,8 @@ impl Client {
     pub fn wait_for_exit_signal(&mut self) {
         trace!("Client_{} waiting for exit signal", self.id);
         while self.coordinatorExit == false {
-            self.recv_result();
             debug!("Client_{} :: wait_for_exit_signal ", self.id);
+            self.recv_result();
         }
         info!("Client_{}::Shutting Down", self.id);
         trace!("Client_{} exiting", self.id);
@@ -97,12 +91,12 @@ impl Client {
         // create a new request with a unique TXID.         
         let request_no: i32 = 0; // TODO--choose another number!
         let txid = TXID_COUNTER.fetch_add(1, Ordering::SeqCst);
-        info!("Client {} request({})->txid:{} called", self.id, request_no, txid);
+        debug!("Client {} request({})->txid:{} called", self.id, request_no, txid);
         let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, txid,
                                                     format!("Client_{}", self.id), request_no);
         let pmClone = pm.clone();
-        self.sender.send_timeout(pm,Duration::from_millis(500));
-        info!("Client {} request({})->txid:{} send", self.id, request_no, txid);
+        self.sender.send_timeout(pm, Duration::from_millis(500));
+        debug!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pmClone);
         trace!("Client_{}::exit send_next_operation", self.id);
     }
@@ -140,12 +134,6 @@ impl Client {
     /// transaction requests made by this client before exiting. 
     /// 
     pub fn report_status(&mut self) {
-
-        // TODO: collect real stats!
-        let successful_ops: usize = 0;
-        let failed_ops: usize = 0;
-        let unknown_ops: usize = 0;
-        //println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, successful_ops, failed_ops, unknown_ops);
         println!("Client_{}:\tC:{}\tA:{}\tU:{}", self.id, self.successful, self.failed, self.unknown);
     }
 
@@ -166,6 +154,6 @@ impl Client {
         }
         self.wait_for_exit_signal();
         //self.report_status();
-        info!("Client_{}::Shutting Down", self.id);
+        debug!("Client_{}::Shutting Down", self.id);
     }
 }

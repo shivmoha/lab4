@@ -122,19 +122,14 @@ pub fn check_last_run(
     let mut logs = HashMap::new();
     for pid in 0..n_participants {
         let pid_str = format!("participant_{}", pid);
-        let plogpath = format!("{}//{}.log", logpathbase, pid_str);
+        let plogpath = format!("{}//{}.commitlog", logpathbase, pid_str);
         logs.insert(pid_str, plogpath.clone());
     }
-    let clogpath = format!("{}//{}", logpathbase, "coordinator.log");
+    let clogpath = format!("{}//{}", logpathbase, "coordinator.commitlog");
     let clog = CLog::from_file(clogpath);
 
     let mut ncommit = 0;
     let mut nabort = 0;
-
-    // let committed = clog.iter().filter(|e|
-    //     ProtocolMessage::from_string(&String::from_utf8_lossy(e.payload()).as_ref().to_string()).mtype == MessageType::CoordinatorCommit).
-    //     collect();
-
 
     for msg in clog.iter() {
         let pm = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());

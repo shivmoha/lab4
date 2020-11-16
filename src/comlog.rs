@@ -40,7 +40,7 @@ impl CLog {
     pub fn from_file(fpath: String) -> MessageBuf {
         let opts = LogOptions::new(fpath);
         let mut log = CommitLog::new(opts).unwrap();
-        let messages = log.read(0, ReadLimit::max_bytes(1024 * 10)).unwrap();
+        let messages = log.read(0, ReadLimit::max_bytes(1024 * 100)).unwrap();
         return messages;
     }
 
@@ -49,8 +49,12 @@ impl CLog {
         self.log.append_msg(ProtocolMessage::to_string(&pm)).unwrap();
     }
 
+    pub fn readAllMessage(&mut self) -> MessageBuf {
+        let messages = self.log.read(0, ReadLimit::max_bytes(1024 * 10)).unwrap();
+        return messages;
+    }
+
     pub fn read(&mut self, offset: i32) -> message::ProtocolMessage {
-        // let messages = self.log.read(*offset as u64, ReadLimit::default()).unwrap();
         let messages = self.log.read(offset as u64, ReadLimit::default()).unwrap();
         for msg in messages.iter() {
             println!("{} - {}", msg.offset(), String::from_utf8_lossy(msg.payload()));

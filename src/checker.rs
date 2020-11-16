@@ -6,17 +6,15 @@
 //! are found, and the number of clients, participants. Loads and analyses 
 //! log files to check a handful of correctness invariants. 
 //! 
-extern crate clap;
-extern crate ctrlc;
 extern crate log;
 extern crate stderrlog;
-
+extern crate clap;
+extern crate ctrlc;
 use std::collections::HashMap;
-
-use message;
-use message::MessageType;
-use message::ProtocolMessage;
 use oplog::OpLog;
+use message::ProtocolMessage;
+use message::MessageType;
+use message;
 
 ///
 /// check_participant()
@@ -37,18 +35,19 @@ fn check_participant(
     ncommit: usize,
     nabort: usize,
     ccommitted: &HashMap<i32, ProtocolMessage>,
-    plog: &HashMap<i32, ProtocolMessage>,
+    plog: &HashMap<i32, ProtocolMessage>
 ) -> bool {
+
     let mut result = true;
     let pcommitted = plog.iter()
         .filter(|e| (*e.1).mtype == MessageType::CoordinatorCommit)
-        .map(|(k, v)| (k.clone(), v.clone()));
+        .map(|(k,v)| (k.clone(), v.clone()));
     let plcommitted = plog.iter()
         .filter(|e| (*e.1).mtype == MessageType::ParticipantVoteCommit)
-        .map(|(k, v)| (k.clone(), v.clone()));
+        .map(|(k,v)| (k.clone(), v.clone()));
     let paborted = plog.iter()
         .filter(|e| (*e.1).mtype == MessageType::CoordinatorAbort)
-        .map(|(k, v)| (k.clone(), v.clone()));
+        .map(|(k,v)| (k.clone(), v.clone()));
 
     let mcommit: HashMap<i32, message::ProtocolMessage> = pcommitted.collect();
     let mlcommit: HashMap<i32, message::ProtocolMessage> = plcommitted.collect();
@@ -58,9 +57,6 @@ fn check_participant(
     let npabort = mabort.len();
     result &= (npcommit <= ncommit) && (nlcommit >= ncommit);
     result &= npabort <= nabort;
-
-    debug!("{}",participant);
-
     assert!(ncommit <= nlcommit);
     assert!(npcommit <= ncommit); //npcommit = # coordinator commit in participant log  .. ncommit = # of commits
     assert!(nabort >= npabort);
@@ -113,6 +109,7 @@ pub fn check_last_run(
     n_requests: i32,
     n_participants: i32,
     logpathbase: &String) {
+
     info!("Checking 2PC run:  {} requests * {} clients, {} participants",
           n_requests,
           n_clients,
@@ -132,16 +129,16 @@ pub fn check_last_run(
     let cmap = lck.lock().unwrap();
     let committed: HashMap<i32, message::ProtocolMessage> =
         cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorCommit)
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .map(|(k,v)| (k.clone(), v.clone()))
             .collect();
     let aborted: HashMap<i32, message::ProtocolMessage> =
         cmap.iter().filter(|e| (*e.1).mtype == MessageType::CoordinatorAbort)
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .map(|(k,v)| (k.clone(), v.clone()))
             .collect();
     let ncommit = committed.len();
     let nabort = aborted.len();
 
-    for (p, v) in logs.iter() {
+    for(p, v) in logs.iter() {
         let plck = v.arc();
         let plog = plck.lock().unwrap();
         check_participant(p, ncommit, nabort, &committed, &plog);

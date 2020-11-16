@@ -23,7 +23,7 @@ do
             echo "\n******************** ITR ************************"
             echo "\n"
             make clean
-            echo "target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp -t"
+            echo "target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp "
           	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp &
           	sleep 2
           	#pkill -INT target/debug/cs380p-2pc

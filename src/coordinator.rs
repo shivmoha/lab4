@@ -47,17 +47,17 @@ pub enum CoordinatorState {
 #[derive(Debug)]
 pub struct Coordinator {
     state: CoordinatorState,
-    logOp: OpLog,
-    logCommit: CLog,
+    log_op: OpLog,
+    log_commit: CLog,
     op_success_prob: f64,
-    participantsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
-    clientsChannels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
+    participants_channels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
+    clients_channels: Vec<(crossbeam_channel::Sender<ProtocolMessage>, crossbeam_channel::Receiver<ProtocolMessage>)>,
     running: Arc<AtomicBool>,
     successful: usize,
     failed: usize,
     unknown: usize,
-    commitLog: bool,
-    totalRequests: i32,
+    commit_log: bool,
+    total_requests: i32,
 }
 
 ///
@@ -85,17 +85,17 @@ impl Coordinator {
         let commitLogPath = format!("{}/{}", logpath, "coordinator.commitlog");
         Coordinator {
             state: CoordinatorState::Quiescent,
-            logOp: OpLog::new(opLogPath),
-            logCommit: CLog::new(commitLogPath),
+            log_op: OpLog::new(opLogPath),
+            log_commit: CLog::new(commitLogPath),
             op_success_prob: success_prob,
-            participantsChannels: vec![],
-            clientsChannels: vec![],
+            participants_channels: vec![],
+            clients_channels: vec![],
             running: r,
             successful: 0,
             failed: 0,
             unknown: 0,
-            commitLog,
-            totalRequests,
+            commit_log: commitLog,
+            total_requests: totalRequests,
         }
     }
 
@@ -111,8 +111,7 @@ impl Coordinator {
         assert_eq!(self.state, CoordinatorState::Quiescent);
         let (coordinatorSend, participantReceive) = crossbeam_channel::bounded(0);
         let (participantSend, coordinatorReceive) = crossbeam_channel::bounded(0);
-
-        self.participantsChannels.push((coordinatorSend, coordinatorReceive));
+        self.participants_channels.push((coordinatorSend, coordinatorReceive));
         return (participantSend, participantReceive);
     }
 
@@ -128,7 +127,7 @@ impl Coordinator {
         assert_eq!(self.state, CoordinatorState::Quiescent);
         let (coordinatorSend, clientReceive) = crossbeam_channel::bounded(0);
         let (clientSend, coordinatorReceive) = crossbeam_channel::bounded(0);
-        self.clientsChannels.push((coordinatorSend, coordinatorReceive));
+        self.clients_channels.push((coordinatorSend, coordinatorReceive));
         return (clientSend, clientReceive);
     }
 
@@ -146,6 +145,7 @@ impl Coordinator {
         } else {
             // don't send anything!
             // (simulates failure)
+            sender.send(pm);
             result = false;
         }
         return result;
@@ -160,7 +160,7 @@ impl Coordinator {
         let mut result = Option::None;
         assert!(self.state == CoordinatorState::Quiescent);
         trace!("coordinator::recv_request...");
-        let clientChannels = self.clientsChannels.clone();
+        let clientChannels = self.clients_channels.clone();
         for clientChannel in clientChannels {
             let msg = clientChannel.1.try_recv();
             if msg.is_ok() {
@@ -184,34 +184,31 @@ impl Coordinator {
     }
 
     pub fn send_recovery_response(&mut self, pm: ProtocolMessage, id: usize) {
-        if self.commitLog == true {
-            for msg in self.logCommit.readAllMessage().iter() {
-                let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
-                if cmsg.txid == pm.txid {
-                    debug!("Coordinator:: Sending recovery response to participant_{}", id);
-                    self.participantsChannels[id].0.send(ProtocolMessage::generate(cmsg.clone().mtype, cmsg.clone().txid,
-                                                                                   cmsg.clone().senderid, cmsg.clone().opid));
-                }
-            }
-        } else {
-            for (_, message) in self.logOp.arc().lock().unwrap().iter() {
-                if message.txid == pm.txid {
-                    debug!("Coordinator:: Sending recovery response to participant_{}", id);
-                    self.participantsChannels[id].0.send(ProtocolMessage::generate(message.clone().mtype, message.clone().txid,
-                                                                                   message.clone().senderid, message.clone().opid));
-                }
-            }
-        }
+        // if self.commit_log == true {
+        //     for msg in self.log_commit.readAllMessage().iter() {
+        //         let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
+        //         if cmsg.txid == pm.txid {
+        //             debug!("Coordinator:: Sending recovery response to participant_{}", id);
+        //             self.participants_channels[id].0.send(ProtocolMessage::generate(cmsg.clone().mtype, cmsg.clone().txid,
+        //                                                                             cmsg.clone().senderid, cmsg.clone().opid));
+        //         }
+        //     }
+        // } else {
+        //     for (_, message) in self.log_op.arc().lock().unwrap().iter() {
+        //         if message.txid == pm.txid {
+        //             debug!("Coordinator:: Sending recovery response to participant_{}", id);
+        //             self.participants_channels[id].0.send(ProtocolMessage::generate(message.clone().mtype, message.clone().txid,
+        //                                                                             message.clone().senderid, message.clone().opid));
+        //         }
+        //     }
+        // }
     }
 
-    // Will append to log based on the logtype
     fn appendToLog(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
-        if self.commitLog == true {
-            info!("CommitLog");
-            self.logCommit.append(t, tid, sender, op);
+        if self.commit_log == true {
+            self.log_commit.append(t, tid, sender, op);
         } else {
-            info!("NormalLog");
-            self.logOp.append(t, tid, sender, op);
+            self.log_op.append(t, tid, sender, op);
         }
     }
 
@@ -223,9 +220,8 @@ impl Coordinator {
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     ///
     pub fn protocol(&mut self) {
-
-        let mut requestProcessed=0;
-        while self.running.load(Ordering::SeqCst) && requestProcessed < self.totalRequests{
+        let mut requestProcessed = 0;
+        while self.running.load(Ordering::SeqCst) && requestProcessed < self.total_requests {
             // Receive request from client
             let client_request_and_id = self.recv_request();
             let client_request = client_request_and_id.0;
@@ -234,18 +230,13 @@ impl Coordinator {
                 continue;
             }
             let client_request = client_request.expect("Error in receiving client request");
-            //Recovery request
-            if client_request.clone().mtype == MessageType::ParticipantRequestRecovery {
-                self.send_recovery_response(client_request, clientId);
-                continue;
-            }
 
             let mut committed = 0;
             let mut aborted = 0;
             let mut unknown = 0;
             let mut i = 0;
-            let participantsChannels = self.participantsChannels.clone();
-            let participantsChannelsR = self.participantsChannels.clone();
+            let participantsChannels = self.participants_channels.clone();
+            let participantsChannelsR = self.participants_channels.clone();
 
             // PHASE: 1 Step 1 Send client request to participants
             for participantChannel in participantsChannels {
@@ -257,7 +248,7 @@ impl Coordinator {
             // PHASE: 1 Step 2 Receive responses from all participants
             i = 0;
             for participantChannel in participantsChannelsR {
-                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(20));
+                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(100));
                 // if the response is received before timeout, process the response
                 if msg_result.is_ok() {
                     let msg = msg_result.unwrap();
@@ -284,22 +275,21 @@ impl Coordinator {
             if aborted > 0 || unknown > 0 {
                 self.appendToLog(CoordinatorAbort, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
                 debug!("Someone voted abort or is unknown,  send abort to all participants");
-                let participantsChannels = self.participantsChannels.clone();
+                let participantsChannels = self.participants_channels.clone();
                 for participantChannel in participantsChannels {
                     participantChannel.0.send(ProtocolMessage::generate(CoordinatorAbort, client_request.clone().txid,
                                                                         client_request.clone().senderid, client_request.clone().opid));
                     debug!("Coordinator:: Sending Abort to Participant");
                 }
                 debug!("Coordinator:: Sending Abort to Client : START");
-                self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
-                                                                                client_request.clone().senderid, client_request.clone().opid));
+                self.clients_channels[clientId].0.send(ProtocolMessage::generate(ClientResultAbort, client_request.clone().txid,
+                                                                                 client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Abort to Client : DONE");
                 self.failed += 1
             } else {
                 self.appendToLog(CoordinatorCommit, client_request.clone().txid, client_request.clone().senderid, client_request.clone().opid);
-                ///All voted commit, send commit to all participants
                 debug!("All voted commit for tid: {} , send commit to all participants", client_request.clone().txid);
-                let participantsChannels = self.participantsChannels.clone();
+                let participantsChannels = self.participants_channels.clone();
                 let mut i = 0;
                 for participantChannel in participantsChannels {
                     participantChannel.0.send(ProtocolMessage::generate(CoordinatorCommit, client_request.clone().txid,
@@ -307,27 +297,27 @@ impl Coordinator {
                     debug!("Coordinator:: Sending Commit to Participant {}", i);
                     i = i + 1;
                 }
-                debug!("Coordinator:: Sending Commit to client {:?}", self.clientsChannels[0].0.capacity());
-                self.clientsChannels[clientId].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
-                                                                                client_request.clone().senderid, client_request.clone().opid));
+                debug!("Coordinator:: Sending Commit to client {:?}", self.clients_channels[0].0.capacity());
+                self.clients_channels[clientId].0.send(ProtocolMessage::generate(ClientResultCommit, client_request.clone().txid,
+                                                                                 client_request.clone().senderid, client_request.clone().opid));
                 debug!("Coordinator:: Sending Commit to client done");
                 self.successful += 1;
             }
-            requestProcessed+=1;
-            warn!("* * * * * * * * Rquest Processed: {}",requestProcessed);
+            requestProcessed += 1;
+            warn!("* * * * * * * * Rquest Processed: {}", requestProcessed);
         }//end of while
 
         info!("Coordinator::All request processed");
         // Tell all participants and clients to shutdown
-        let participantsChannels = self.participantsChannels.clone();
+        let participantsChannels = self.participants_channels.clone();
         for participantChannel in participantsChannels {
             participantChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
                                                                 format!("{}", "Coordinator"), 0));
         }
-        let clientChannels = self.clientsChannels.clone();
+        let clientChannels = self.clients_channels.clone();
         for clientChannel in clientChannels {
-            clientChannel.0.send(ProtocolMessage::generate(CoordinatorExit, 0,
-                                                           format!("{}", "Coordinator"), 0));
+            clientChannel.0.try_send(ProtocolMessage::generate(CoordinatorExit, 0,
+                                                               format!("{}", "Coordinator"), 0));
         }
         self.report_status();
         info!("Coordinator::Shutting Down");

@@ -58,6 +58,9 @@ fn check_participant(
     let npabort = mabort.len();
     result &= (npcommit <= ncommit) && (nlcommit >= ncommit);
     result &= npabort <= nabort;
+
+    debug!("{}",participant);
+
     assert!(ncommit <= nlcommit);
     assert!(npcommit <= ncommit); //npcommit = # coordinator commit in participant log  .. ncommit = # of commits
     assert!(nabort >= npabort);

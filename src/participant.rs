@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicI32;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::thread::sleep;
 use std::time::Duration;
 
 use commitlog::message::MessageSet;
@@ -60,6 +61,7 @@ pub struct Participant {
     failed: usize,
     unknown: usize,
     commitLog: bool,
+    failure_prob: f64,
 }
 
 ///
@@ -93,7 +95,8 @@ impl Participant {
         r: Arc<AtomicBool>,
         f_success_prob_ops: f64,
         f_success_prob_msg: f64,
-        commitLog: bool) -> Participant {
+        commitLog: bool,
+        participant_failure_prob: f64) -> Participant {
         let participantName = format!("{}{}", "participant_", i);
         let participantOpLogPath = format!("{}/{}.log", logpath.clone(), participantName);
         let participantCommitLogPath = format!("{}/{}.commitlog", logpath, participantName);
@@ -112,6 +115,7 @@ impl Participant {
             failed: 0,
             unknown: 0,
             commitLog,
+            failure_prob: participant_failure_prob,
         }
     }
 
@@ -204,8 +208,10 @@ impl Participant {
 
     pub fn triggerRecoveryProtocol(&mut self) {
         //Map of transaction_id to count
+        debug!(" Participant_{} : Initiated Recovery", self.id);
         let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
         if self.commitLog == true {
+
             for msg in self.logCommit.readAllMessage().iter() {
                 let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
                 let existing = recoveryTransactions.get(&cmsg.txid);
@@ -215,7 +221,23 @@ impl Participant {
                     recoveryTransactions.insert(cmsg.txid, existing.unwrap() + 1);
                 }
             }
+
+            let coordinatorLogs = CLog::from_file("./tmp/coordinator.commitlog".parse().unwrap());
+            for (k, v) in recoveryTransactions.iter() {
+                if *v == 1 {
+                    for msg in coordinatorLogs.iter() {
+                        let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
+                        if cmsg.txid == *k {
+                            debug!("Coordinator:: Sending recovery response to participant_{}", self.id);
+                            self.appendToLog(cmsg.clone().mtype, cmsg.clone().txid,
+                                             cmsg.clone().senderid, cmsg.clone().opid);
+                        }
+                    }
+                }
+            }
+
         } else {
+
             for (_, message) in self.logOp.arc().lock().unwrap().iter() {
                 let existing = recoveryTransactions.get(&message.txid);
                 if existing.is_none() {
@@ -224,39 +246,28 @@ impl Participant {
                     recoveryTransactions.insert(message.txid, existing.unwrap() + 1);
                 }
             }
-        }
 
-        for (k, v) in recoveryTransactions.iter() {
-            if *v == 1 {
-                debug!("RECOVERY  Participant_{}:: {} -> {:?}", self.id, k, v);
-                self.send(ProtocolMessage::generate(ParticipantRequestRecovery, *k, format!("participant_{}", self.id), 0));
-                let message = self.receiver.recv();
-                if message.is_ok() {
-                    let message = message.expect("Participant :: Error in receiving message from coordinator");
-                    debug!("RECOVERY Participant_{}:: Received response from coordinator  {:?}", self.id, message);
-                    match message.clone().mtype {
-                        MessageType::CoordinatorCommit => {
-                            self.appendToLog(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
-                            debug!("RECOVERY Participant_{}: Received CoordinatorCommit", self.id);
+            let coordinatorLogs = OpLog::from_file("./tmp/coordinator.log".parse().unwrap());
+            for (k, v) in recoveryTransactions.iter() {
+                if *v == 1 {
+                    for (_, message) in coordinatorLogs.arc().lock().unwrap().iter() {
+                        if message.txid == *k {
+                            warn!("participant_{} : recovered for msh {:?}", self.id, message);
+                            self.appendToLog(message.clone().mtype, message.clone().txid,
+                                             message.clone().senderid, message.clone().opid);
                         }
-                        MessageType::CoordinatorAbort => {
-                            self.appendToLog(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
-                            debug!("RECOVERY Participant_{}: Received CoordinatorAbort", self.id);
-                        }
-                        _ => debug!("No match found")
                     }
                 }
-            } // end of if
-        }//end of for
+            }
+
+        }
     }
 
 
     fn appendToLog(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
         if self.commitLog == true {
-            debug!("CommitLog");
             self.logCommit.append(t, tid, sender, op);
         } else {
-            debug!("NormalLog");
             self.logOp.append(t, tid, sender, op);
         }
     }
@@ -296,11 +307,15 @@ impl Participant {
                     }
                 }
                 MessageType::CoordinatorCommit => {
-                    self.appendToLog(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
-                    debug!("Participant_{}: Received CoordinatorCommit", self.id);
+                    let x: f64 = random();
+                    if x < self.failure_prob {
+                        self.triggerRecoveryProtocol();
+                    } else {
+                        self.appendToLog(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
+                        debug!("Participant_{}: Received CoordinatorCommit", self.id);
+                    }
                 }
                 MessageType::CoordinatorAbort => {
-                    //TODO: Delete entry of commit from log
                     self.appendToLog(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
                 }

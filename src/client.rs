@@ -74,10 +74,10 @@ impl Client {
     /// 
     pub fn wait_for_exit_signal(&mut self) {
         trace!("Client_{} waiting for exit signal", self.id);
-        while self.coordinatorExit == false {
-            debug!("Client_{} :: wait_for_exit_signal ", self.id);
+       // while self.coordinatorExit == false {
+       //     debug!("Client_{} :: wait_for_exit_signal ", self.id);
             self.recv_result();
-        }
+       // }
         info!("Client_{}::Shutting Down", self.id);
         trace!("Client_{} exiting", self.id);
     }
@@ -95,7 +95,8 @@ impl Client {
         let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, txid,
                                                     format!("Client_{}", self.id), request_no);
         let pmClone = pm.clone();
-        self.sender.send_timeout(pm, Duration::from_millis(500));
+        self.sender.send(pm);
+        //self.sender.send_timeout(pm, Duration::from_millis(5000));
         debug!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pmClone);
         trace!("Client_{}::exit send_next_operation", self.id);
@@ -120,7 +121,7 @@ impl Client {
         }
         match msg.clone().mtype {
             MessageType::ClientResultAbort => { self.failed += 1; }
-            MessageType::CoordinatorCommit => { self.successful += 1 }
+            MessageType::ClientResultCommit => { self.successful += 1 }
             MessageType::CoordinatorExit => { self.coordinatorExit = true; }
             _ => {}
         }

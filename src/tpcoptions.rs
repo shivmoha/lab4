@@ -41,7 +41,9 @@ pub struct TPCOptions {
     pub logpath: String,
     // directory for client, participant, and coordinator logs
 
-    pub logtype: bool, // define type of logger: true means use commitlog
+    pub logtype: bool,
+    // define type of logger: true means use commitlog
+    pub participant_failure_prob: f64,
 }
 
 impl TPCOptions {
@@ -59,6 +61,7 @@ impl TPCOptions {
         let default_mode = "run";
         let default_success_prob_ops = "1.0";
         let default_success_prob_msg = "1.0";
+        let default_participant_failure_prob = "0.0";
         let default_logpath = "./tmp";
 
 
@@ -110,6 +113,11 @@ impl TPCOptions {
                 .short("t")
                 .required(false)
                 .help("logtype"))
+            .arg(Arg::with_name("participant_failure_prob")
+                .short("f")
+                .required(false)
+                .takes_value(true)
+                .help("probability participants fails"))
             .get_matches();
 
         let _mode = matches.value_of("mode").unwrap_or(default_mode);
@@ -121,11 +129,11 @@ impl TPCOptions {
         let _verbosity = matches.value_of("verbose").unwrap_or(default_verbosity).parse::<usize>().unwrap();
         let _logpath = matches.value_of("logpath").unwrap_or(default_logpath);
         let _logtype = matches.is_present("logtype");
+        let f_participant_failure_prob = matches.value_of("participant_failure_prob").unwrap_or(default_participant_failure_prob).parse::<f64>().unwrap();
 
         match _mode.as_ref() {
             "run" => {}
             "check" => {}
-            "chkcom" => {}
             _ => panic!("unknown execution mode requested!"),
         }
 
@@ -139,6 +147,7 @@ impl TPCOptions {
             mode: _mode.to_string(),
             logpath: _logpath.to_string(),
             logtype: _logtype,
+            participant_failure_prob: f_participant_failure_prob,
         }
     }
 }

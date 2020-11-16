@@ -6,6 +6,7 @@ extern crate log;
 extern crate serde_json;
 extern crate stderrlog;
 
+use std::alloc::dealloc;
 use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -112,7 +113,8 @@ fn register_participants(
     running: &Arc<AtomicBool>,
     success_prob_ops: f64,
     success_prob_msg: f64,
-    logType: bool) -> Vec<Participant> {
+    logType: bool,
+    participant_failure_prob: f64) -> Vec<Participant> {
     let mut participants = vec![];
     // register participants with coordinator (set up communication channels and sync objects)
     // add client to the vector and return the vector.
@@ -123,7 +125,7 @@ fn register_participants(
         trace!("Registering participant : {}", i);
         participants.push(Participant::new(i, String::new(), participantSend,
                                            participantReceive, log_path_base.to_string(), running.clone(),
-                                           success_prob_ops, success_prob_msg, logType));
+                                           success_prob_ops, success_prob_msg, logType, participant_failure_prob));
     }
     return participants;
 }
@@ -231,7 +233,7 @@ fn run(opts: &tpcoptions::TPCOptions) {
                                    opts.logtype, opts.num_clients * opts.num_requests);
     clients = register_clients(&mut coordinator, opts.num_clients, &opts.logpath, &running);
     participants = register_participants(&mut coordinator, opts.num_participants, &opts.logpath, &running,
-                                         opts.success_probability_ops, opts.success_probability_msg, opts.logtype);
+                                         opts.success_probability_ops, opts.success_probability_msg, opts.logtype, opts.participant_failure_prob);
 
     let coordinatorHandle = thread::spawn(move || {
         coordinator.protocol();
@@ -249,6 +251,15 @@ fn run(opts: &tpcoptions::TPCOptions) {
     }
 }
 
+fn check_last_run(clients: i32, requests: i32, participants: i32, logpath: &String, logtype: bool) {
+    if logtype == true {
+        debug!("Commit Log Checker");
+        commit_log_checker::check_last_run(clients, requests, participants, logpath);
+    } else {
+        checker::check_last_run(clients, requests, participants, logpath);
+    }
+}
+
 fn main() {
     let opts = tpcoptions::TPCOptions::new();
     stderrlog::new()
@@ -261,14 +272,13 @@ fn main() {
 
     match opts.mode.as_ref() {
         "run" => run(&opts),
-        "check" => checker::check_last_run(opts.num_clients,
-                                           opts.num_requests,
-                                           opts.num_participants,
-                                           &opts.logpath.to_string()),
-        "chkcom" => commit_log_checker::check_last_run(opts.num_clients,
-                                                       opts.num_requests,
-                                                       opts.num_participants,
-                                                       &opts.logpath.to_string()),
+        "check" => check_last_run(opts.num_clients,
+                                  opts.num_requests,
+                                  opts.num_participants,
+                                  &opts.logpath.to_string(),
+                                  opts.logtype),
         _ => panic!("unknown mode"),
     }
 }
+
+

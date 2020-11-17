@@ -5,14 +5,8 @@
 extern crate log;
 extern crate stderrlog;
 
-use std::alloc::dealloc;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use std::time::Duration;
-
 use message;
 use message::{MessageType, ProtocolMessage};
 use message::RequestStatus;
@@ -28,7 +22,7 @@ pub struct Client {
     successful: usize,
     failed: usize,
     unknown: usize,
-    coordinatorExit: bool,
+    coordinator_exit: bool,
 }
 
 ///
@@ -64,7 +58,7 @@ impl Client {
             successful: 0,
             failed: 0,
             unknown: 0,
-            coordinatorExit: false,
+            coordinator_exit: false,
         }
     }
 
@@ -74,10 +68,7 @@ impl Client {
     /// 
     pub fn wait_for_exit_signal(&mut self) {
         trace!("Client_{} waiting for exit signal", self.id);
-       // while self.coordinatorExit == false {
-       //     debug!("Client_{} :: wait_for_exit_signal ", self.id);
-            self.recv_result();
-       // }
+        self.recv_result();
         info!("Client_{}::Shutting Down", self.id);
         trace!("Client_{} exiting", self.id);
     }
@@ -94,11 +85,11 @@ impl Client {
         debug!("Client {} request({})->txid:{} called", self.id, request_no, txid);
         let pm = message::ProtocolMessage::generate(message::MessageType::ClientRequest, txid,
                                                     format!("Client_{}", self.id), request_no);
-        let pmClone = pm.clone();
+        let pm_clone = pm.clone();
         self.sender.send(pm);
         //self.sender.send_timeout(pm, Duration::from_millis(5000));
         debug!("Client {} request({})->txid:{} send", self.id, request_no, txid);
-        debug!("Client: Send request  {:?}", pmClone);
+        debug!("Client: Send request  {:?}", pm_clone);
         trace!("Client_{}::exit send_next_operation", self.id);
     }
 
@@ -122,7 +113,7 @@ impl Client {
         match msg.clone().mtype {
             MessageType::ClientResultAbort => { self.failed += 1; }
             MessageType::ClientResultCommit => { self.successful += 1 }
-            MessageType::CoordinatorExit => { self.coordinatorExit = true; }
+            MessageType::CoordinatorExit => { self.coordinator_exit = true; }
             _ => {}
         }
         debug!("Client: Received response {:?}", msg);
@@ -147,7 +138,7 @@ impl Client {
     /// 
     pub fn protocol(&mut self, n_requests: i32) {
         for i in 0..n_requests {
-            if self.coordinatorExit == true {
+            if self.coordinator_exit == true {
                 break;
             }
             self.send_next_operation();

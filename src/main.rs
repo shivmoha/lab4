@@ -6,21 +6,13 @@ extern crate log;
 extern crate serde_json;
 extern crate stderrlog;
 
-use std::alloc::dealloc;
-use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::thread::{JoinHandle, sleep};
-use std::time::Duration;
-
-use commitlog::*;
+use std::thread::{JoinHandle};
 use commitlog::ReadError::CorruptLog;
-
 use client::Client;
-use comlog::CLog;
 use coordinator::Coordinator;
-use message::MessageType::ClientRequest;
 use participant::Participant;
 
 pub mod message;
@@ -147,13 +139,8 @@ fn launch_clients(
     clients: Vec<Client>,
     n_requests: i32,
     handles: &mut Vec<JoinHandle<()>>) -> &mut Vec<JoinHandle<()>> {
-    // do something to create threads for client 'processes'
-    // the mutable handles parameter allows you to return 
-    // more than one wait handle to the caller to join on.
     for mut client in clients {
         let handle = thread::spawn(move || {
-            // debug!("in thread ");
-            // thread::sleep(Duration::from_millis(4000));
             client.protocol(n_requests);
         });
         handles.push(handle);
@@ -178,16 +165,11 @@ fn launch_participants(
     handles: &mut Vec<JoinHandle<()>>) -> &mut Vec<JoinHandle<()>> {
     for mut participant in participants {
         let handle = thread::spawn(move || {
-            // debug!("in thread ");
-            // thread::sleep(Duration::from_millis(4000));
             participant.protocol();
         });
         handles.push(handle);
     }
     return handles;
-    // do something to create threads for participant 'processes'
-    // the mutable handles parameter allows you to return 
-    // more than one wait handle to the caller to join on. 
 }
 
 /// 
@@ -203,19 +185,8 @@ fn launch_participants(
 /// 6. creates a thread to run the coordinator protocol
 /// 
 fn run(opts: &tpcoptions::TPCOptions) {
-
-    // vector for wait handles, allowing us to 
-    // wait for client, participant, and coordinator 
-    // threads to join.
     let mut participantHandles: Vec<JoinHandle<()>> = vec![];
     let mut clientHandles: Vec<JoinHandle<()>> = vec![];
-
-
-    // create an atomic bool object and a signal handler
-    // that sets it. this allows us to inform clients and 
-    // participants that we are exiting the simulation 
-    // by pressing "control-C", which will set the running 
-    // flag to false. 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
@@ -228,13 +199,11 @@ fn run(opts: &tpcoptions::TPCOptions) {
     let mut coordinator: Coordinator;
     let clients: Vec<Client>;
     let participants: Vec<Participant>;
-
     coordinator = Coordinator::new(opts.logpath.clone(), running.clone(), opts.success_probability_ops,
                                    opts.logtype, opts.num_clients * opts.num_requests);
     clients = register_clients(&mut coordinator, opts.num_clients, &opts.logpath, &running);
     participants = register_participants(&mut coordinator, opts.num_participants, &opts.logpath, &running,
                                          opts.success_probability_ops, opts.success_probability_msg, opts.logtype, opts.participant_failure_prob);
-
     let coordinatorHandle = thread::spawn(move || {
         coordinator.protocol();
     });

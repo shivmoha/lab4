@@ -40,7 +40,6 @@ pub struct TPCOptions {
     // "run" or "check"
     pub logpath: String,
     // directory for client, participant, and coordinator logs
-
     pub logtype: bool,
     // define type of logger: true means use commitlog
     pub participant_failure_prob: f64,
@@ -62,7 +61,7 @@ impl TPCOptions {
         let default_success_prob_ops = "1.0";
         let default_success_prob_msg = "1.0";
         let default_participant_failure_prob = "0.0";
-        let default_logpath = "./tmp";
+        let default_logpath = "~/tmp";
 
 
         let matches = App::new("cs380p-2pc")

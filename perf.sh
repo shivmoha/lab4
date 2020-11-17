@@ -1,9 +1,9 @@
 # !/bin/bash
 
 
-msgp=(1 0.95 0.75)
-oppa=(1 0.95 0.75)
-fail=(0.25 0.15 0.10)
+msgp=(0.95 0.75)
+oppa=(0.95 0.75)
+fail=(0.95 0.15 0.10)
 clients=(5 15 20 25 50)
 participants=(10 15 20 25)
 request=(100 150 200 500)
@@ -22,12 +22,10 @@ do
         do
             echo "\n******************** ITR ************************"
             echo "\n"
-            make clean
+            #make clean
             echo "target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp "
-          	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp &
-          	sleep 2
-          	#pkill -INT target/debug/cs380p-2pc
-          	#pid=`ps | grep cs380p-2pc | cut -d' ' -f2`
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp  &
+          	sleep 5
           	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
           	echo "Killing: "$pid
           	kill -INT $pid &> /dev/null
@@ -39,7 +37,6 @@ do
           	  echo "\n ERROR "
           	  exit 1
           	fi
-          	pkill target/debug/cs380p-2pc
         done
       done
     done

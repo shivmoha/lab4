@@ -6,29 +6,19 @@ extern crate log;
 extern crate rand;
 extern crate stderrlog;
 
-use std::alloc::dealloc;
 use std::collections::HashMap;
-use std::process::exit;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::atomic::AtomicI32;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use std::thread::sleep;
-use std::time::Duration;
+use std::sync::atomic::AtomicBool;
 
 use commitlog::message::MessageSet;
-use serde_json::map::Entry;
 
 use ::{message, oplog};
 use comlog::CLog;
 use message::MessageType;
-use message::MessageType::{ParticipantRequestRecovery, ParticipantVoteAbort, ParticipantVoteCommit};
+use message::MessageType::{ParticipantVoteAbort, ParticipantVoteCommit};
 use message::ProtocolMessage;
 use message::RequestStatus;
 use oplog::OpLog;
-use participant::rand::prelude::*;
 
 use self::rand::random;
 
@@ -50,8 +40,8 @@ pub enum ParticipantState {
 pub struct Participant {
     id: i32,
     state: ParticipantState,
-    logOp: OpLog,
-    logCommit: CLog,
+    logop: OpLog,
+    logcommit: CLog,
     op_success_prob: f64,
     msg_success_prob: f64,
     sender: crossbeam_channel::Sender<ProtocolMessage>,
@@ -60,8 +50,9 @@ pub struct Participant {
     successful: usize,
     failed: usize,
     unknown: usize,
-    commitLog: bool,
+    commit_log: bool,
     failure_prob: f64,
+    logpath: String,
 }
 
 ///
@@ -95,16 +86,16 @@ impl Participant {
         r: Arc<AtomicBool>,
         f_success_prob_ops: f64,
         f_success_prob_msg: f64,
-        commitLog: bool,
+        commit_log: bool,
         participant_failure_prob: f64) -> Participant {
-        let participantName = format!("{}{}", "participant_", i);
-        let participantOpLogPath = format!("{}/{}.log", logpath.clone(), participantName);
-        let participantCommitLogPath = format!("{}/{}.commitlog", logpath, participantName);
+        let participant_name = format!("{}{}", "participant_", i);
+        let participant_oplog_path = format!("{}/{}.log", logpath.clone(), participant_name);
+        let participant_commitlog_path = format!("{}/{}.commitlog", logpath, participant_name);
 
         Participant {
             id: i,
-            logOp: OpLog::new(participantOpLogPath),
-            logCommit: CLog::new(participantCommitLogPath),
+            logop: OpLog::new(participant_oplog_path),
+            logcommit: CLog::new(participant_commitlog_path),
             op_success_prob: f_success_prob_ops,
             msg_success_prob: f_success_prob_msg,
             state: ParticipantState::Quiescent,
@@ -114,8 +105,9 @@ impl Participant {
             successful: 0,
             failed: 0,
             unknown: 0,
-            commitLog,
+            commit_log: commit_log,
             failure_prob: participant_failure_prob,
+            logpath: logpath,
         }
     }
 
@@ -176,10 +168,10 @@ impl Participant {
         let request_message = request.clone().expect("Error in performing operation");
         let x: f64 = random();
         if x > self.op_success_prob {
-            self.appendToLog(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
+            self.append_to_log(ParticipantVoteAbort, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Aborted;
         } else {
-            self.appendToLog(ParticipantVoteCommit, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
+            self.append_to_log(ParticipantVoteCommit, request_message.clone().txid, request_message.clone().senderid, request_message.clone().opid);
             result = RequestStatus::Committed;
         };
         trace!("exit participant::perform_operation");
@@ -206,69 +198,74 @@ impl Participant {
     }
 
 
-    pub fn triggerRecoveryProtocol(&mut self) {
+    pub fn trigger_recovery_protocol(&mut self) {
         //Map of transaction_id to count
         debug!(" Participant_{} : Initiated Recovery", self.id);
-        let mut recoveryTransactions: HashMap<i32, i32> = HashMap::new();
-        if self.commitLog == true {
-
-            for msg in self.logCommit.readAllMessage().iter() {
+        let mut recovery_transactions: HashMap<i32, i32> = HashMap::new();
+        if self.commit_log == true {
+            for msg in self.logcommit.read_all_message().iter() {
                 let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
-                let existing = recoveryTransactions.get(&cmsg.txid);
-                if existing.is_none() {
-                    recoveryTransactions.insert(cmsg.txid, 1);
-                } else {
-                    recoveryTransactions.insert(cmsg.txid, existing.unwrap() + 1);
+                if cmsg.mtype == MessageType::ParticipantVoteCommit {
+                    recovery_transactions.insert(cmsg.txid, recovery_transactions.get(&cmsg.txid).unwrap_or(&0) + 1);
+                } else if cmsg.mtype == MessageType::CoordinatorCommit || cmsg.mtype == MessageType::CoordinatorAbort {
+                    recovery_transactions.insert(cmsg.txid, recovery_transactions.get(&cmsg.txid).unwrap_or(&0) - 1);
                 }
             }
-
-            let coordinatorLogs = CLog::from_file("./tmp/coordinator.commitlog".parse().unwrap());
-            for (k, v) in recoveryTransactions.iter() {
+            let commitLogPath = format!("{}/{}", self.logpath, "coordinator.commitlog");
+            let coordinator_logs = CLog::from_file(commitLogPath);
+            for (k, v) in recovery_transactions.iter() {
                 if *v == 1 {
-                    for msg in coordinatorLogs.iter() {
+                    for msg in coordinator_logs.iter() {
                         let cmsg = ProtocolMessage::from_string(&String::from_utf8_lossy(msg.payload()).as_ref().to_string());
                         if cmsg.txid == *k {
-                            debug!("Coordinator:: Sending recovery response to participant_{}", self.id);
-                            self.appendToLog(cmsg.clone().mtype, cmsg.clone().txid,
-                                             cmsg.clone().senderid, cmsg.clone().opid);
+                            self.append_to_log(cmsg.clone().mtype, cmsg.clone().txid,
+                                               cmsg.clone().senderid, cmsg.clone().opid);
                         }
                     }
                 }
             }
-
         } else {
-
-            for (_, message) in self.logOp.arc().lock().unwrap().iter() {
-                let existing = recoveryTransactions.get(&message.txid);
-                if existing.is_none() {
-                    recoveryTransactions.insert(message.txid, 1);
-                } else {
-                    recoveryTransactions.insert(message.txid, existing.unwrap() + 1);
+            for (_, message) in self.logop.arc().lock().unwrap().iter() {
+                if message.mtype == MessageType::ParticipantVoteCommit {
+                    recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap_or(&0) + 1);
+                } else if message.mtype == MessageType::CoordinatorCommit || message.mtype == MessageType::CoordinatorAbort {
+                    recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap_or(&0) - 1);
                 }
-            }
 
-            let coordinatorLogs = OpLog::from_file("./tmp/coordinator.log".parse().unwrap());
-            for (k, v) in recoveryTransactions.iter() {
+                // if recovery_transactions.contains_key(&message.txid) == false {
+                //     warn!("Message does not exist : {:?}", message);
+                //     if message.mtype == MessageType::ParticipantVoteCommit {
+                //         recovery_transactions.insert(message.txid, 1);
+                //         warn!("Adding msg for recov: {:?}", message);
+                //     }
+                // } else {
+                //     recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap() + 1);
+                //     warn!(" msg count more than two: {:?}", message);
+                // }
+                //
+            }
+            let opLogPath = format!("{}/{}", self.logpath, "coordinator.log");
+            let coordinator_logs = OpLog::from_file(opLogPath);
+            for (k, v) in recovery_transactions.iter() {
                 if *v == 1 {
-                    for (_, message) in coordinatorLogs.arc().lock().unwrap().iter() {
+                    for (_, message) in coordinator_logs.arc().lock().unwrap().iter() {
                         if message.txid == *k {
                             warn!("participant_{} : recovered for msh {:?}", self.id, message);
-                            self.appendToLog(message.clone().mtype, message.clone().txid,
-                                             message.clone().senderid, message.clone().opid);
+                            self.append_to_log(message.clone().mtype, message.clone().txid,
+                                               message.clone().senderid, message.clone().opid);
                         }
                     }
                 }
             }
-
         }
     }
 
 
-    fn appendToLog(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
-        if self.commitLog == true {
-            self.logCommit.append(t, tid, sender, op);
+    fn append_to_log(&mut self, t: message::MessageType, tid: i32, sender: String, op: i32) {
+        if self.commit_log == true {
+            self.logcommit.append(t, tid, sender, op);
         } else {
-            self.logOp.append(t, tid, sender, op);
+            self.logop.append(t, tid, sender, op);
         }
     }
 
@@ -279,24 +276,24 @@ impl Participant {
     /// HINT: wait for some kind of exit signal before returning from the protocol!
     /// 
     pub fn protocol(&mut self) {
-        let mut coordinatorExit = false;
-        let mut requestProcessed = 0;
+        let mut coordinator_exit = false;
+        let mut request_processed = 0;
         //Coming up, maybe from crash, try recovery
-        self.triggerRecoveryProtocol();
-        while coordinatorExit == false {
+        self.trigger_recovery_protocol();
+        while coordinator_exit == false {
             // Receive client request
             let message = self.receiver.recv();
             if message.is_err() {
                 continue;
             }
-            requestProcessed += 1;
+            request_processed += 1;
             let message = message.expect("Participant :: Error in receiving message from coordinator");
             debug!("Participant_{}  : Message received :: {:?}", self.id, message);
             match message.clone().mtype {
                 MessageType::ClientRequest => {
                     debug!("Participant_{}: Operation Received", self.id);
-                    let operationResult = self.perform_operation(&Some(message.clone()));
-                    if operationResult == true {
+                    let operation_result = self.perform_operation(&Some(message.clone()));
+                    if operation_result == true {
                         self.send_unreliable(ProtocolMessage::generate(ParticipantVoteCommit, message.clone().txid, message.clone().senderid, message.clone().opid));
                         debug!("Participant_{}: Response Send Commit", self.id);
                         self.successful += 1;
@@ -309,21 +306,20 @@ impl Participant {
                 MessageType::CoordinatorCommit => {
                     let x: f64 = random();
                     if x < self.failure_prob {
-                        self.triggerRecoveryProtocol();
+                        self.trigger_recovery_protocol();
                     } else {
-                        self.appendToLog(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
+                        self.append_to_log(MessageType::CoordinatorCommit, message.clone().txid, message.clone().senderid, message.clone().opid);
                         debug!("Participant_{}: Received CoordinatorCommit", self.id);
                     }
                 }
                 MessageType::CoordinatorAbort => {
-                    self.appendToLog(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
+                    self.append_to_log(MessageType::CoordinatorAbort, message.clone().txid, message.clone().senderid, message.clone().opid);
                     debug!("Participant_{}: Received CoordinatorAbort", self.id);
                 }
-                MessageType::CoordinatorExit => { coordinatorExit = true; }
+                MessageType::CoordinatorExit => { coordinator_exit = true; }
                 _ => debug!("No match found")
             }
         } //End of while
-        // self.wait_for_exit_signal();
         self.report_status();
         info!("Participant_{}::Shutting Down", self.id);
     }

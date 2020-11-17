@@ -64,7 +64,7 @@ fn check_participant(
                 }
             }
             result &= foundlocaltxid == 1;
-            assert!(foundlocaltxid == 1); // exactly one commit of txid per participant
+            assert_eq!(foundlocaltxid, 1); // exactly one commit of txid per participant
         }
     }
     println!("{} OK: C:{} == {}(C-global), A:{} <= {}(A-global)",

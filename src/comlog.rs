@@ -28,7 +28,7 @@ impl Debug for CLog {
 
 impl CLog {
     pub fn new(fpath: String) -> CLog {
-        debug!("Removed existing directory {}", fpath.clone());
+        trace!("Removed existing directory {}", fpath.clone());
         std::fs::remove_dir_all(fpath.clone());
         let opts = LogOptions::new(fpath);
         let mut log = CommitLog::new(opts).unwrap();
@@ -49,7 +49,7 @@ impl CLog {
         self.log.append_msg(ProtocolMessage::to_string(&pm)).unwrap();
     }
 
-    pub fn readAllMessage(&mut self) -> MessageBuf {
+    pub fn read_all_message(&mut self) -> MessageBuf {
         let messages = self.log.read(0, ReadLimit::max_bytes(1024 * 10000)).unwrap();
         return messages;
     }

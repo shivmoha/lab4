@@ -24,19 +24,85 @@ do
             echo "\n"
             #make clean
             echo "target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp "
+
+            echo "\n**** Basic ****"
+          	target/debug/cs380p-2pc -s ${op} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp  &
+          	sleep 5
+          	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
+          	#echo "Killing: "$pid
+          	kill -INT $pid &> /dev/null
+          	sleep 2
+          	echo "\nChecking:\n"
+          	target/debug/cs380p-2pc -s ${op} -c ${client} -p ${participant} -r ${request} -m check -v 0 -l ./tmp
+          	RC=$?
+          	if [[ $RC -ne 0 ]];then
+          	  echo "\n ERROR "
+          	  exit 1
+          	fi
+
+          	echo "\n**** Message Fail : S ****"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp  &
+          	sleep 5
+          	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
+          	#echo "Killing: "$pid
+          	kill -INT $pid &> /dev/null
+          	sleep 2
+          	echo "\nChecking:\n"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m check -v 0 -l ./tmp
+          	RC=$?
+          	if [[ $RC -ne 0 ]];then
+          	  echo "\n ERROR "
+          	  exit 1
+          	fi
+
+          	echo "\n**** Commitlog : t ****"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp  -t &
+          	sleep 5
+          	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
+          	#echo "Killing: "$pid
+          	kill -INT $pid &> /dev/null
+          	sleep 2
+          	echo "\nChecking:\n"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -c ${client} -p ${participant} -r ${request} -m check -v 0 -l ./tmp -t
+          	RC=$?
+          	if [[ $RC -ne 0 ]];then
+          	  echo "\n ERROR "
+          	  exit 1
+          	fi
+
+
+          	echo "\n**** Recovery Normal Log: f ****"
           	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp  &
           	sleep 5
           	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
-          	echo "Killing: "$pid
+          	#echo "Killing: "$pid
           	kill -INT $pid &> /dev/null
           	sleep 2
-          	echo "\n"
+          	echo "\nChecking:\n"
           	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m check -v 0 -l ./tmp
           	RC=$?
           	if [[ $RC -ne 0 ]];then
           	  echo "\n ERROR "
           	  exit 1
           	fi
+
+          	echo "\n**** Recovery Commit Log: f ****"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m run -v 0 -l ./tmp -t &
+          	sleep 5
+          	pid=`ps -ef | grep '[c]s380p-2pc' | awk '{print $2}'`
+          	#echo "Killing: "$pid
+          	kill -INT $pid &> /dev/null
+          	sleep 2
+          	echo "\nChecking:\n"
+          	target/debug/cs380p-2pc -S ${msg} -s ${op} -f ${f} -c ${client} -p ${participant} -r ${request} -m check -v 0 -l ./tmp -t
+          	RC=$?
+          	if [[ $RC -ne 0 ]];then
+          	  echo "\n ERROR "
+          	  exit 1
+          	fi
+
+
+
         done
       done
     done

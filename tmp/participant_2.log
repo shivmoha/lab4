@@ -1,3 +1,0 @@
-{"mtype":"ParticipantVoteCommit","uid":20,"txid":1,"senderid":"Client_0","opid":0}
-{"mtype":"CoordinatorCommit","uid":60,"txid":1,"senderid":"Client_0","opid":0}
-{"mtype":"ParticipantVoteCommit","uid":93,"txid":2,"senderid":"Client_1","opid":0}

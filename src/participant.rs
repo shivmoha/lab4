@@ -211,8 +211,8 @@ impl Participant {
                     recovery_transactions.insert(cmsg.txid, recovery_transactions.get(&cmsg.txid).unwrap_or(&0) - 1);
                 }
             }
-            let commitLogPath = format!("{}/{}", self.logpath, "coordinator.commitlog");
-            let coordinator_logs = CLog::from_file(commitLogPath);
+            let commit_log_path = format!("{}/{}", self.logpath, "coordinator.commitlog");
+            let coordinator_logs = CLog::from_file(commit_log_path);
             for (k, v) in recovery_transactions.iter() {
                 if *v == 1 {
                     for msg in coordinator_logs.iter() {
@@ -232,8 +232,8 @@ impl Participant {
                     recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap_or(&0) - 1);
                 }
             }
-            let opLogPath = format!("{}/{}", self.logpath, "coordinator.log");
-            let coordinator_logs = OpLog::from_file(opLogPath);
+            let op_log_path = format!("{}/{}", self.logpath, "coordinator.log");
+            let coordinator_logs = OpLog::from_file(op_log_path);
             for (k, v) in recovery_transactions.iter() {
                 if *v == 1 {
                     for (_, message) in coordinator_logs.arc().lock().unwrap().iter() {

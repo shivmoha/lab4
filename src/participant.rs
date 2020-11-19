@@ -231,18 +231,6 @@ impl Participant {
                 } else if message.mtype == MessageType::CoordinatorCommit || message.mtype == MessageType::CoordinatorAbort {
                     recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap_or(&0) - 1);
                 }
-
-                // if recovery_transactions.contains_key(&message.txid) == false {
-                //     warn!("Message does not exist : {:?}", message);
-                //     if message.mtype == MessageType::ParticipantVoteCommit {
-                //         recovery_transactions.insert(message.txid, 1);
-                //         warn!("Adding msg for recov: {:?}", message);
-                //     }
-                // } else {
-                //     recovery_transactions.insert(message.txid, recovery_transactions.get(&message.txid).unwrap() + 1);
-                //     warn!(" msg count more than two: {:?}", message);
-                // }
-                //
             }
             let opLogPath = format!("{}/{}", self.logpath, "coordinator.log");
             let coordinator_logs = OpLog::from_file(opLogPath);

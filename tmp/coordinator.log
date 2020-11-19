@@ -1,10 +1,1 @@
-{"mtype":"CoordinatorAbort","uid":18,"txid":1,"senderid":"Client_1","opid":0}
-{"mtype":"CoordinatorAbort","uid":57,"txid":2,"senderid":"Client_0","opid":0}
-{"mtype":"CoordinatorAbort","uid":92,"txid":6,"senderid":"Client_1","opid":0}
-{"mtype":"CoordinatorAbort","uid":133,"txid":7,"senderid":"Client_0","opid":0}
-{"mtype":"CoordinatorAbort","uid":174,"txid":8,"senderid":"Client_1","opid":0}
-{"mtype":"CoordinatorAbort","uid":213,"txid":9,"senderid":"Client_0","opid":0}
-{"mtype":"CoordinatorAbort","uid":252,"txid":10,"senderid":"Client_1","opid":0}
-{"mtype":"CoordinatorAbort","uid":293,"txid":11,"senderid":"Client_0","opid":0}
-{"mtype":"CoordinatorAbort","uid":336,"txid":12,"senderid":"Client_1","opid":0}
-{"mtype":"CoordinatorAbort","uid":373,"txid":13,"senderid":"Client_0","opid":0}
+{"mtype":"CoordinatorCommit","uid":56,"txid":1,"senderid":"Client_0","opid":0}

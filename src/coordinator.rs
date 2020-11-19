@@ -18,6 +18,7 @@ use message::MessageType::{ClientResultAbort, ClientResultCommit, CoordinatorAbo
 use message::ProtocolMessage;
 use message::RequestStatus;
 use oplog::OpLog;
+
 use self::rand::random;
 
 /// CoordinatorState
@@ -123,14 +124,8 @@ impl Coordinator {
     ///       the actual sending!
     /// 
     pub fn send(&mut self, sender: &crossbeam_channel::Sender<ProtocolMessage>, pm: ProtocolMessage) -> bool {
-        let x: f64 = random();
-        let mut result: bool = true;
-        if x < self.op_success_prob {
-            sender.send(pm);
-        } else {
-            result = false;
-        }
-        return result;
+        sender.send(pm);
+        return true;
     }
 
     /// 

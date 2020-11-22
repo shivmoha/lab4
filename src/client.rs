@@ -7,6 +7,7 @@ extern crate stderrlog;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+
 use message;
 use message::{MessageType, ProtocolMessage};
 use message::RequestStatus;
@@ -87,7 +88,6 @@ impl Client {
                                                     format!("Client_{}", self.id), request_no);
         let pm_clone = pm.clone();
         self.sender.send(pm);
-        //self.sender.send_timeout(pm, Duration::from_millis(5000));
         debug!("Client {} request({})->txid:{} send", self.id, request_no, txid);
         debug!("Client: Send request  {:?}", pm_clone);
         trace!("Client_{}::exit send_next_operation", self.id);
@@ -145,7 +145,6 @@ impl Client {
             self.recv_result();
         }
         self.wait_for_exit_signal();
-        //self.report_status();
         debug!("Client_{}::Shutting Down", self.id);
     }
 }

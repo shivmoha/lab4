@@ -202,7 +202,7 @@ impl Coordinator {
             // PHASE: 1 Step 2 Receive responses from all participants
             i = 0;
             for participantChannel in participants_channelsR {
-                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(20));
+                let msg_result = participantChannel.1.recv_timeout(Duration::from_millis(100));
                 // if the response is received before timeout, process the response
                 if msg_result.is_ok() {
                     let msg = msg_result.unwrap();
